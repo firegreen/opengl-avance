@@ -13,11 +13,15 @@ uniform vec3 uPointLightPosition;
 uniform vec3 uPointLightIntensity;
 uniform vec3 uKd;
 
+uniform bool uUseTexture;
+
 uniform sampler2D uKdSampler;
 
 void main()
 {
-    vec3 color = vec3(texture(uKdSampler, vTexCoords.xy)) * uKd;
+    vec3 color = uKd;
+    if (uUseTexture)
+        color *= vec3(texture(uKdSampler, vTexCoords.xy));
     float distToPointLight = length(uPointLightPosition - vViewSpacePosition);
     vec3 dirToPointLight = (uPointLightPosition - vViewSpacePosition) / distToPointLight;
     fColor = color * (uDirectionalLightIntensity * max(0.0, dot(vViewSpaceNormal, -uDirectionalLightDir))

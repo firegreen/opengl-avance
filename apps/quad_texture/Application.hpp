@@ -21,7 +21,7 @@ private:
     const std::string m_AppName;
     const std::string m_ImGuiIniFilename;
     const glmlv::fs::path m_ShadersRootPath;
-    const glmlv::fs::path m_AssetsRootPath;
+        const glmlv::fs::path m_AssetsRootPath;
 
     GLuint m_quadVBO = 0;
     GLuint m_quadIBO = 0;

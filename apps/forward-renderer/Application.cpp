@@ -25,8 +25,15 @@ int Application::run()
                 );
         glm::mat4 viewMat = camera.getViewMatrix();
 
-        glm::mat4 cubeModelMat = glm::rotate(glm::translate(glm::mat4(), glm::vec3(0,0,-5)), glm::pi<float>()/8.0f, glm::vec3(1,1,1));
-        glm::mat4 sphereModelMat = glm::rotate(glm::translate(glm::mat4(), glm::vec3(-4,3,-10)), glm::pi<float>()/8.0f, glm::vec3(1,1,1));
+        glm::mat4 cubeModelMat = glm::rotate(glm::translate(glm::mat4(), glm::vec3(0,0,-5)), glm::pi<float>()/8.0f, glm::vec3(1,1,0.5f));
+        glm::mat4 sphereModelMat = glm::rotate(glm::translate(glm::mat4(), glm::vec3(-4,3,-10)), glm::pi<float>()/8.0f, glm::vec3(0.5f,1,1));
+        glm::mat4 sceneModelMat =
+                glm::scale(
+                    glm::rotate(
+                        glm::translate(glm::mat4(), glm::vec3(1,-2,-4)),
+                        0.0f, glm::vec3(1,1,1)),
+                    glm::vec3(0.03f,0.03f,0.03f)
+                );
 
         glm::vec4 directionalDir = viewMat * glm::vec4(0,.5,-1,0);
         glProgramUniform3f(program.glId(), uDirectionalLightDir,directionalDir.x,directionalDir.y,directionalDir.z);
@@ -37,6 +44,7 @@ int Application::run()
         glProgramUniform3f(program.glId(),uPointLightIntensity, 1,1,1);
 
         glProgramUniform3f(program.glId(),uKd, 1,1,1);
+        glProgramUniform1i(program.glId(),uUseTexture, 1);
 
         glClear(GL_COLOR_BUFFER_BIT);
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -65,12 +73,47 @@ int Application::run()
         glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &modelViewProjMat[0][0]);
         glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &normalMat[0][0]);
 
-        glBindSampler(0, samplerObject); // Tell to OpenGL what sampler we want to use on this texture unit
+        glBindSampler(0, samplerObject);
 
         glBindTexture(GL_TEXTURE_2D, metalTexture);
 
         glBindVertexArray(sphereVAO);
         glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
+
+        glBindSampler(0, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+
+        modelViewMat = viewMat * sceneModelMat;
+        modelViewProjMat = projectionMat * modelViewMat;
+        normalMat = glm::transpose(glm::inverse(modelViewMat));
+        glUniformMatrix4fv(uModelViewMatrix,1, GL_FALSE, &modelViewMat[0][0]);
+        glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &modelViewProjMat[0][0]);
+        glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &normalMat[0][0]);
+
+        glProgramUniform1i(program.glId(),uUseTexture, 0);
+
+        glBindVertexArray(sceneVAO);
+        uint32_t indexOffset = 0, indexCount;
+        glm::vec3 Kd;
+        if (loadedScene.materialCount)
+        {
+            for (int i=0; i<loadedScene.shapeCount; i++)
+            {
+                Kd= loadedScene.materials[loadedScene.materialIDPerShape[i]].Kd;
+                indexCount = loadedScene.indexCountPerShape[i];
+                glProgramUniform3f(program.glId(),uKd, Kd.r,Kd.g,Kd.b);
+                glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
+                indexOffset += indexCount;
+            }
+        }
+        else
+        {
+            Kd= glm::vec3(0.8f,0.8f,0.8f);
+            glProgramUniform3f(program.glId(),uKd, Kd.r,Kd.g,Kd.b);
+            glDrawElements(GL_TRIANGLES, loadedScene.indexBuffer.size(), GL_UNSIGNED_INT, 0);
+        }
+
 
         glBindVertexArray(0);
         //
@@ -129,36 +172,44 @@ Application::Application(int argc, char** argv):
     m_ImGuiIniFilename { m_AppName + ".imgui.ini" },
     m_ShadersRootPath { m_AppPath.parent_path() / "shaders" },
     m_AssetsRootPath { m_AppPath.parent_path() / "assets" },
+    camera(m_GLFWHandle.window(),0),
     cube(glmlv::makeCube()),
-    sphere(glmlv::makeSphere(10)),
-    camera(m_GLFWHandle.window(),0)
-
+    sphere(glmlv::makeSphere(10))
 {
     ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
+    glmlv::loadObj(m_AssetsRootPath / m_AppName / "models/rose.obj",loadedScene, true);
+    camera.setSpeed(glm::length(loadedScene.bboxMax - loadedScene.bboxMin) * 0.1f);
 
     // VBO Init (vertex buffer)
     glGenBuffers(1, &cubeVBO);
     glGenBuffers(1, &sphereVBO);
+    glGenBuffers(1, &sceneVBO);
 
     glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
     glBufferStorage(GL_ARRAY_BUFFER, cube.vertexBuffer.size()*sizeof(glmlv::Vertex3f3f2f), cube.vertexBuffer.data(), 0);
     glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
     glBufferStorage(GL_ARRAY_BUFFER, sphere.vertexBuffer.size()*sizeof(glmlv::Vertex3f3f2f), sphere.vertexBuffer.data(), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, sceneVBO);
+    glBufferStorage(GL_ARRAY_BUFFER, loadedScene.vertexBuffer.size()*sizeof(glmlv::Vertex3f3f2f), loadedScene.vertexBuffer.data(), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // IBO Init (indice Buffer)
     glGenBuffers(1, &cubeIBO);
     glGenBuffers(1, &sphereIBO);
+    glGenBuffers(1, &sceneIBO);
 
     glBindBuffer(GL_ARRAY_BUFFER, cubeIBO);
     glBufferStorage(GL_ARRAY_BUFFER, sizeof(uint32_t)*cube.indexBuffer.size(), cube.indexBuffer.data(), 0);
     glBindBuffer(GL_ARRAY_BUFFER, sphereIBO);
     glBufferStorage(GL_ARRAY_BUFFER, sizeof(uint32_t)*sphere.indexBuffer.size(), sphere.indexBuffer.data(), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, sceneIBO);
+    glBufferStorage(GL_ARRAY_BUFFER, sizeof(uint32_t)*loadedScene.indexBuffer.size(), loadedScene.indexBuffer.data(), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glGenVertexArrays(1, &cubeVAO);
     glGenVertexArrays(1, &sphereVAO);
+    glGenVertexArrays(1, &sceneVAO);
 
     // Here we load and compile shaders from the library
     program = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "forward.vs.glsl", m_ShadersRootPath / m_AppName / "forward.fs.glsl" });
@@ -177,8 +228,9 @@ Application::Application(int argc, char** argv):
 
     uPointLightPosition = glGetUniformLocation(program.glId(), "uPointLightPosition");
     uPointLightIntensity = glGetUniformLocation(program.glId(), "uPointLightIntensity");
-    uKd = glGetUniformLocation(program.glId(), "uKd");
 
+    uUseTexture = glGetUniformLocation(program.glId(), "uUseTexture");
+    uKd = glGetUniformLocation(program.glId(), "uKd");
     uKdSampler = glGetUniformLocation(program.glId(), "uKdSampler");
 
     glBindVertexArray(cubeVAO);
@@ -212,6 +264,22 @@ Application::Application(int argc, char** argv):
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereIBO);
 
+
+    glBindVertexArray(sceneVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, sceneVBO);
+
+    glEnableVertexAttribArray(positionAttrLocation);
+    glVertexAttribPointer(positionAttrLocation, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, position));
+
+    glEnableVertexAttribArray(normalAttrLocation);
+    glVertexAttribPointer(normalAttrLocation, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, normal));
+
+    glEnableVertexAttribArray(texCoordsAttrLocation);
+    glVertexAttribPointer(texCoordsAttrLocation, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sceneIBO);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
@@ -234,24 +302,31 @@ Application::~Application()
     if (cubeIBO) {
         glDeleteBuffers(1, &cubeIBO);
     }
-
     if (cubeVBO) {
         glDeleteBuffers(1, &cubeVBO);
     }
-
     if (cubeVAO) {
         glDeleteBuffers(1, &cubeVAO);
     }
+
     if (sphereIBO) {
         glDeleteBuffers(1, &sphereIBO);
     }
-
     if (sphereVBO) {
         glDeleteBuffers(1, &sphereVBO);
     }
-
     if (sphereVAO) {
         glDeleteBuffers(1, &sphereVAO);
+    }
+
+    if (sceneIBO) {
+        glDeleteBuffers(1, &sceneIBO);
+    }
+    if (sceneVBO) {
+        glDeleteBuffers(1, &sceneVBO);
+    }
+    if (sceneVAO) {
+        glDeleteBuffers(1, &sceneVAO);
     }
 
     ImGui_ImplGlfwGL3_Shutdown();

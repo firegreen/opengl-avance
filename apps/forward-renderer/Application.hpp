@@ -5,6 +5,7 @@
 #include <glmlv/GLProgram.hpp>
 #include <glmlv/simple_geometry.hpp>
 #include <glmlv/ViewController.hpp>
+#include <glmlv/load_obj.hpp>
 
 class Application
 {
@@ -38,6 +39,10 @@ private:
     GLuint sphereVAO = 0;
     GLuint sphereIBO = 0;
 
+    GLuint sceneVBO = 0;
+    GLuint sceneVAO = 0;
+    GLuint sceneIBO = 0;
+
     GLuint uModelViewProjMatrix = 0;
     GLuint uModelViewMatrix = 0;
     GLuint uNormalMatrix = 0;
@@ -52,10 +57,11 @@ private:
     GLuint uPointLightIntensity;
     GLuint uKd;
 
+    GLuint uUseTexture;
     GLuint uKdSampler;
-
     GLuint samplerObject;
 
     glmlv::SimpleGeometry cube;
     glmlv::SimpleGeometry sphere;
+    glmlv::ObjData loadedScene;
 };
