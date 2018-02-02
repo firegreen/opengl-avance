@@ -6,11 +6,15 @@
 #include <glm/glm.hpp>
 #include <glmlv/imgui_impl_glfw_gl3.hpp>
 #include <glmlv/simple_geometry.hpp>
-#include <glmlv/Image2DRGBA.hpp>
 
 int Application::run()
 {
     float clearColor[3] = { 0, 0, 0 };
+    float dirLightColor[3] = { 1,1,0.5f };
+    float dirLightDirection[3] = { 0.4f, 0.2f, -1 };
+    float pointLightColor[3] = { 40.f,10.f,80.f };
+    float pointLightPos[3] = { -1, -10, 1 };
+    float ambiantLightColor[3] = { 0.2f,0.2f,0.2f };
     // Loop until the user closes the window
     glEnable(GL_DEPTH_TEST);
     for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
@@ -35,15 +39,20 @@ int Application::run()
                     glm::vec3(0.03f,0.03f,0.03f)
                 );
 
-        glm::vec4 directionalDir = viewMat * glm::vec4(0,.5,-1,0);
+        glm::vec4 directionalDir = glm::normalize(viewMat * glm::vec4(dirLightDirection[0],dirLightDirection[1],dirLightDirection[2],0));
         glProgramUniform3f(program.glId(), uDirectionalLightDir,directionalDir.x,directionalDir.y,directionalDir.z);
-        glProgramUniform3f(program.glId(), uDirectionalLightIntensity, 1,1,1);
+        glProgramUniform3f(program.glId(), uDirectionalLightIntensity, dirLightColor[0],dirLightColor[1],dirLightColor[2]);
 
-        glm::vec4 pointPos = viewMat * glm::vec4(-5,10,-5,1);
+        glm::vec4 pointPos = viewMat * glm::vec4(pointLightPos[0],pointLightPos[1],pointLightPos[2],1);
         glProgramUniform3f(program.glId(),uPointLightPosition, pointPos.x,pointPos.y,pointPos.z);
-        glProgramUniform3f(program.glId(),uPointLightIntensity, 1,1,1);
+        glProgramUniform3f(program.glId(),uPointLightIntensity, pointLightColor[0],pointLightColor[1],pointLightColor[2]);
 
-        glProgramUniform3f(program.glId(),uKd, 1,1,1);
+        glProgramUniform3f(program.glId(),uAmbiantLightIntensity, ambiantLightColor[0],ambiantLightColor[1],ambiantLightColor[2]);
+
+        glProgramUniform3f(program.glId(),uKd, 1, 1, 1);
+        glProgramUniform3f(program.glId(),uKs, 0.2f, 0.2f, 0.2f);
+        glProgramUniform3f(program.glId(),uKa, 1, 1, 1);
+        glProgramUniform1f(program.glId(),uShininess, 0.2f);
         glProgramUniform1i(program.glId(),uUseTexture, 1);
 
         glClear(GL_COLOR_BUFFER_BIT);
@@ -73,14 +82,11 @@ int Application::run()
         glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &modelViewProjMat[0][0]);
         glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &normalMat[0][0]);
 
-        glBindSampler(0, samplerObject);
-
         glBindTexture(GL_TEXTURE_2D, metalTexture);
 
         glBindVertexArray(sphereVAO);
         glDrawElements(GL_TRIANGLES, sphere.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
 
-        glBindSampler(0, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
 
 
@@ -95,21 +101,34 @@ int Application::run()
 
         glBindVertexArray(sceneVAO);
         uint32_t indexOffset = 0, indexCount;
-        glm::vec3 Kd;
+
         if (loadedScene.materialCount)
         {
             for (int i=0; i<loadedScene.shapeCount; i++)
             {
-                Kd= loadedScene.materials[loadedScene.materialIDPerShape[i]].Kd;
+                glmlv::ObjData::PhongMaterial& mat=
+                        loadedScene.materials[loadedScene.materialIDPerShape[i]];
+                if (mat.KdTextureId>=0)
+                {
+                    glBindTexture(GL_TEXTURE_2D, sceneTextures[mat.KdTextureId]);
+                    glProgramUniform1i(program.glId(),uUseTexture, 1);
+                }
+                else
+                {
+                    glProgramUniform1i(program.glId(),uUseTexture, 0);
+                }
                 indexCount = loadedScene.indexCountPerShape[i];
-                glProgramUniform3f(program.glId(),uKd, Kd.r,Kd.g,Kd.b);
+                glProgramUniform3f(program.glId(),uKd, mat.Kd.r,mat.Kd.g,mat.Kd.b);
+                glProgramUniform3f(program.glId(),uKs, mat.Ks.r,mat.Ks.g,mat.Ks.b);
+                glProgramUniform3f(program.glId(),uKa, mat.Ka.r,mat.Ka.g,mat.Ka.b);
+                glProgramUniform1f(program.glId(),uShininess, mat.shininess);
                 glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
                 indexOffset += indexCount;
             }
         }
         else
         {
-            Kd= glm::vec3(0.8f,0.8f,0.8f);
+            glm::vec3 Kd(0.8f,0.8f,0.8f);
             glProgramUniform3f(program.glId(),uKd, Kd.r,Kd.g,Kd.b);
             glDrawElements(GL_TRIANGLES, loadedScene.indexBuffer.size(), GL_UNSIGNED_INT, 0);
         }
@@ -130,6 +149,24 @@ int Application::run()
             if (ImGui::ColorEdit3("clearColor", clearColor)) {
                 glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.f);
             }
+            ImGui::NewLine();
+            ImGui::BeginChild("Directional Light", ImVec2(ImGui::GetWindowContentRegionWidth(),100));
+            ImGui::Text("Directional Light");
+            ImGui::ColorEdit3("Color", dirLightColor);
+            ImGui::DragFloat3("Direction", dirLightDirection,1.0f,-50.f,50.f);
+            ImGui::EndChild();
+
+            ImGui::BeginChild("Point Light", ImVec2(ImGui::GetWindowContentRegionWidth(),100));
+            ImGui::Text("Point Light");
+            ImGui::ColorEdit3("Color", pointLightColor);
+            ImGui::DragFloat3("Position", pointLightPos,1.0f,-50.f,50.f);
+            ImGui::EndChild();
+
+            ImGui::BeginChild("Ambiant Light", ImVec2(ImGui::GetWindowContentRegionWidth(),100));
+            ImGui::Text("Ambiant Light");
+            ImGui::ColorEdit3("Color", ambiantLightColor);
+            ImGui::EndChild();
+
             ImGui::End();
         }
 
@@ -156,7 +193,11 @@ int Application::run()
 void Application::loadImage(std::string filename, GLuint& textureID)
 {
     auto image = glmlv::readImage(m_AssetsRootPath / m_AppName / "textures" / filename);
+    loadImage(image,textureID);
+}
 
+void Application::loadImage(const glmlv::Image2DRGBA& image, GLuint& textureID)
+{
     glActiveTexture(GL_TEXTURE0);
 
     glGenTextures(1, &textureID);
@@ -178,7 +219,7 @@ Application::Application(int argc, char** argv):
 {
     ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
-    glmlv::loadObj(m_AssetsRootPath / m_AppName / "models/rose.obj",loadedScene, true);
+    glmlv::loadObj(m_AssetsRootPath / m_AppName / "models/crytek-sponza/sponza.obj",loadedScene, true);
     camera.setSpeed(glm::length(loadedScene.bboxMax - loadedScene.bboxMin) * 0.1f);
 
     // VBO Init (vertex buffer)
@@ -229,8 +270,14 @@ Application::Application(int argc, char** argv):
     uPointLightPosition = glGetUniformLocation(program.glId(), "uPointLightPosition");
     uPointLightIntensity = glGetUniformLocation(program.glId(), "uPointLightIntensity");
 
-    uUseTexture = glGetUniformLocation(program.glId(), "uUseTexture");
+    uAmbiantLightIntensity = glGetUniformLocation(program.glId(), "uAmbiantLightIntensity");
+
     uKd = glGetUniformLocation(program.glId(), "uKd");
+    uKs = glGetUniformLocation(program.glId(), "uKs");
+    uKa = glGetUniformLocation(program.glId(), "uKa");
+    uShininess = glGetUniformLocation(program.glId(), "uShininess");
+
+    uUseTexture = glGetUniformLocation(program.glId(), "uUseTexture");
     uKdSampler = glGetUniformLocation(program.glId(), "uKdSampler");
 
     glBindVertexArray(cubeVAO);
@@ -286,6 +333,11 @@ Application::Application(int argc, char** argv):
 
     loadImage("sample_metalTexture.jpg", metalTexture);
     loadImage("sample_woodTexture.jpg", woodTexture);
+    sceneTextures.resize(loadedScene.textures.size(),0);
+    for (int i=0; i<sceneTextures.size(); ++i)
+    {
+        loadImage(loadedScene.textures[i], sceneTextures[i]);
+    }
 
     // Note: no need to bind a sampler for modifying it: the sampler API is already direct_state_access
     glGenSamplers(1, &samplerObject);

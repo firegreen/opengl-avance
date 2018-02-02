@@ -6,6 +6,7 @@
 #include <glmlv/simple_geometry.hpp>
 #include <glmlv/ViewController.hpp>
 #include <glmlv/load_obj.hpp>
+#include <glmlv/Image2DRGBA.hpp>
 
 class Application
 {
@@ -14,8 +15,10 @@ public:
     ~Application();
 
     int run();
+
 private:
     void loadImage(std::string filename, GLuint &textureID);
+    void loadImage(const glmlv::Image2DRGBA &image, GLuint &textureID);
 
     const size_t m_nWindowWidth = 1280;
     const size_t m_nWindowHeight = 720;
@@ -49,13 +52,20 @@ private:
 
     GLuint metalTexture = 0;
     GLuint woodTexture = 0;
+    std::vector<GLuint> sceneTextures;
 
     GLuint uDirectionalLightDir;
     GLuint uDirectionalLightIntensity;
 
     GLuint uPointLightPosition;
     GLuint uPointLightIntensity;
+
+    GLuint uAmbiantLightIntensity;
+
     GLuint uKd;
+    GLuint uKs;
+    GLuint uKa;
+    GLuint uShininess;
 
     GLuint uUseTexture;
     GLuint uKdSampler;
