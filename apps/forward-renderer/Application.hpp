@@ -8,6 +8,38 @@
 #include <glmlv/load_obj.hpp>
 #include <glmlv/Image2DRGBA.hpp>
 
+#define MAXLIGHTCOUNT 32
+
+struct PointLight
+{
+    glm::vec4 color{0,0,0,0};
+    glm::vec4 position{0,0,0,0};
+
+    PointLight() {}
+    PointLight(glm::vec4 color, glm::vec4 position)
+        : color(color), position(position){}
+};
+
+struct DirectionnalLight
+{
+    glm::vec4 color{0,0,0,0};
+    glm::vec4 direction{1,0,0,1};
+
+    DirectionnalLight() {}
+    DirectionnalLight(glm::vec4 color, glm::vec4 direction)
+        : color(color), direction(direction){}
+};
+
+/*
+struct ShaderLightsData
+{
+    uint pointLightCount = 0;
+    uint directionnalLightCount = 0;
+
+    PointLight pointLights[MAXLIGHTCOUNT];
+    DirectionnalLight dirLights[MAXLIGHTCOUNT];
+};*/
+
 class Application
 {
 public:
@@ -46,6 +78,11 @@ private:
     GLuint sceneVAO = 0;
     GLuint sceneIBO = 0;
 
+    std::vector<DirectionnalLight> dirLightData;
+    std::vector<PointLight> pointLightData;
+    GLuint dirLightSSBO = 0;
+    GLuint pointLightSSBO = 0;
+
     GLuint uModelViewProjMatrix = 0;
     GLuint uModelViewMatrix = 0;
     GLuint uNormalMatrix = 0;
@@ -69,7 +106,13 @@ private:
 
     GLuint uUseTexture;
     GLuint uKdSampler;
+    GLuint uKaSampler;
+    GLuint uKsSampler;
+    GLuint uNormalSampler;
     GLuint samplerObject;
+
+    GLuint bDirLightData;
+    GLuint bPointLightData;
 
     glmlv::SimpleGeometry cube;
     glmlv::SimpleGeometry sphere;

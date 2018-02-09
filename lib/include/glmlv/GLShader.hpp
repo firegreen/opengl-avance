@@ -128,7 +128,8 @@ inline GLShader loadShader(const fs::path& shaderPath)
     GLShader shader{ (*it).second.first };
     shader.setSource(loadShaderSource(shaderPath));
     shader.compile();
-    if (!shader.getCompileStatus()) {
+    if (!shader.getCompileStatus())
+    {
         std::cerr << "Shader compilation error:" << shader.getInfoLog() << std::endl;
         throw std::runtime_error("Shader compilation error:" + shader.getInfoLog());
     }

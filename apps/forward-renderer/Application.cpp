@@ -17,6 +17,19 @@ int Application::run()
     float ambiantLightColor[3] = { 0.2f,0.2f,0.2f };
     // Loop until the user closes the window
     glEnable(GL_DEPTH_TEST);
+
+    dirLightData.push_back(DirectionnalLight(glm::vec4(0,1,0,1),glm::normalize(glm::vec4(1,1,0,1))));
+    dirLightData.push_back(DirectionnalLight(glm::vec4(1,1,0,1),glm::normalize(glm::vec4(1,-1,1,1))));
+    pointLightData.push_back(PointLight(glm::vec4(20,50,30,1),glm::vec4(1,1,-1,0)));
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
+    GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+    memcpy(p, dirLightData.data(), sizeof(DirectionnalLight)*dirLightData.size());
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+    p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+    memcpy(p, pointLightData.data(), sizeof(PointLight)*pointLightData.size());
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
     for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
     {
         const auto seconds = glfwGetTime();
@@ -69,6 +82,10 @@ int Application::run()
         glActiveTexture(GL_TEXTURE0);
         glUniform1i(uKdSampler, 0); // Set the uniform to 0 because we use texture unit 0
         glBindSampler(0, samplerObject); // Tell to OpenGL what sampler we want to use on this texture unit
+        glUniform1i(uKaSampler, 1); // Set the uniform to 0 because we use texture unit 0
+        glBindSampler(1, samplerObject); // Tell to OpenGL what sampler we want to use on this texture unit
+        glUniform1i(uKsSampler, 2); // Set the uniform to 0 because we use texture unit 0
+        glBindSampler(2, samplerObject); // Tell to OpenGL what sampler we want to use on this texture unit
 
         glBindTexture(GL_TEXTURE_2D, woodTexture);
 
@@ -110,7 +127,12 @@ int Application::run()
                         loadedScene.materials[loadedScene.materialIDPerShape[i]];
                 if (mat.KdTextureId>=0)
                 {
+                    glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, sceneTextures[mat.KdTextureId]);
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, sceneTextures[mat.KaTextureId]);
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, sceneTextures[mat.KsTextureId]);
                     glProgramUniform1i(program.glId(),uUseTexture, 1);
                 }
                 else
@@ -132,7 +154,6 @@ int Application::run()
             glProgramUniform3f(program.glId(),uKd, Kd.r,Kd.g,Kd.b);
             glDrawElements(GL_TRIANGLES, loadedScene.indexBuffer.size(), GL_UNSIGNED_INT, 0);
         }
-
 
         glBindVertexArray(0);
         //
@@ -217,9 +238,10 @@ Application::Application(int argc, char** argv):
     cube(glmlv::makeCube()),
     sphere(glmlv::makeSphere(10))
 {
+    GLuint dirlightBindingIndex = 1, pointlightBindingIndex = 2;
     ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
-    glmlv::loadObj(m_AssetsRootPath / m_AppName / "models/crytek-sponza/sponza.obj",loadedScene, true);
+    glmlv::loadObj(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj",loadedScene, true);
     camera.setSpeed(glm::length(loadedScene.bboxMax - loadedScene.bboxMin) * 0.1f);
 
     // VBO Init (vertex buffer)
@@ -252,6 +274,18 @@ Application::Application(int argc, char** argv):
     glGenVertexArrays(1, &sphereVAO);
     glGenVertexArrays(1, &sceneVAO);
 
+    glGenBuffers(1, &dirLightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData, GL_DYNAMIC_COPY);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingIndex, dirLightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    glGenBuffers(1, &pointLightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData, GL_DYNAMIC_COPY);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingIndex, pointLightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
     // Here we load and compile shaders from the library
     program = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "forward.vs.glsl", m_ShadersRootPath / m_AppName / "forward.fs.glsl" });
 
@@ -279,6 +313,14 @@ Application::Application(int argc, char** argv):
 
     uUseTexture = glGetUniformLocation(program.glId(), "uUseTexture");
     uKdSampler = glGetUniformLocation(program.glId(), "uKdSampler");
+    uKaSampler = glGetUniformLocation(program.glId(), "uKaSampler");
+    uKsSampler = glGetUniformLocation(program.glId(), "uKsSampler");
+
+    bDirLightData = glGetProgramResourceIndex(program.glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
+    glShaderStorageBlockBinding(program.glId(), bDirLightData, dirlightBindingIndex);
+
+    bPointLightData = glGetProgramResourceIndex(program.glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
+    glShaderStorageBlockBinding(program.glId(), bPointLightData, pointlightBindingIndex);
 
     glBindVertexArray(cubeVAO);
 
@@ -295,7 +337,6 @@ Application::Application(int argc, char** argv):
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIBO);
 
-
     glBindVertexArray(sphereVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
@@ -310,7 +351,6 @@ Application::Application(int argc, char** argv):
     glVertexAttribPointer(texCoordsAttrLocation, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f), (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereIBO);
-
 
     glBindVertexArray(sceneVAO);
 
@@ -341,8 +381,8 @@ Application::Application(int argc, char** argv):
 
     // Note: no need to bind a sampler for modifying it: the sampler API is already direct_state_access
     glGenSamplers(1, &samplerObject);
-    glSamplerParameteri(samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(samplerObject, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(samplerObject, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glSamplerParameteri(samplerObject, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glSamplerParameteri(samplerObject, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glSamplerParameteri(samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
