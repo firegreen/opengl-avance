@@ -16,16 +16,18 @@ class GLFWHandle
 {
 public:
     GLFWHandle(int width, int height, const char * title)
-    {
-        if (!glfwInit()) {
-            std::cerr << "Unable to init GLFW.\n";
-            throw std::runtime_error("Unable to init GLFW.\n");
-        }
+	{
+		if (!glfwInit()) {
+			std::cerr << "Unable to init GLFW.\n";
+			throw std::runtime_error("Unable to init GLFW.\n");
+		}
 
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+#ifndef _WIN32
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+#endif
         glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
         m_pWindow = glfwCreateWindow(int(width), int(height), title, nullptr, nullptr);
@@ -39,15 +41,21 @@ public:
 
         glfwSwapInterval(0); // No VSync
 
-        if (!gladLoadGL()) {
-            std::cerr << "Unable to init OpenGL.\n";
-            throw std::runtime_error("Unable to init OpenGL.\n");
-        }
+		if (!gladLoadGL()) {
+			std::cerr << "Unable to init OpenGL.\n";
+			throw std::runtime_error("Unable to init OpenGL.\n");
+		}
 
         glmlv::initGLDebugOutput();
 
+		const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
+		const GLubyte* version = glGetString (GL_VERSION); // version as a string
+
+		std::cout << "Renderer: " << renderer << std::endl;
+		std::cout << "OpenGL version supported: " << version << std::endl;
+
         // Setup ImGui binding
-        ImGui_ImplGlfwGL3_Init(m_pWindow, true);
+		ImGui_ImplGlfwGL3_Init(m_pWindow, true);
     }
 
     ~GLFWHandle()

@@ -1,11 +1,11 @@
 #include "Application.hpp"
 
 #include <iostream>
-
 #include <imgui.h>
 #include <glm/glm.hpp>
 #include <glmlv/imgui_impl_glfw_gl3.hpp>
 #include <glmlv/simple_geometry.hpp>
+
 
 int Application::run()
 {
@@ -23,6 +23,11 @@ int Application::run()
     pointLightData.push_back(PointLight(glm::vec4(20,50,30,1),glm::vec4(1,1,-1,0)));
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
     GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+	if (!p)
+	{
+		GLenum error = glGetError();
+		throw std::runtime_error("Cannot get shader storage buffer: " + std::to_string(error));
+	}
     memcpy(p, dirLightData.data(), sizeof(DirectionnalLight)*dirLightData.size());
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
@@ -328,6 +333,9 @@ void Application::loadImage(const glmlv::Image2DRGBA& image, GLuint& textureID)
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, image.width(), image.height());
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width(), image.height(), GL_RGBA, GL_UNSIGNED_BYTE, image.data());
     glBindTexture(GL_TEXTURE_2D, 0);
+	GLenum error = glGetError();
+	if (error != GL_NO_ERROR)
+		std::cerr << "error while loading texture: " << error << std::endl;
 }
 
 void Application::reserveImage(const size_t width, const size_t height, GLuint& textureID, GLenum format)
@@ -349,12 +357,14 @@ Application::Application(int argc, char** argv):
     cube(glmlv::makeCube()),
     sphere(glmlv::makeSphere(10))
 {
-    glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
-    GLuint dirlightBindingIndex = 1, pointlightBindingIndex = 2;
-    ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
+	GLenum error;
+	glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
+	GLuint dirlightBindingIndex = 1, pointlightBindingIndex = 2;
+	ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
-    glmlv::loadObj(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj",loadedScene, true);
-    camera.setSpeed(glm::length(loadedScene.bboxMax - loadedScene.bboxMin) * 0.1f);
+	camera.setSpeed(glm::length(loadedScene.bboxMax - loadedScene.bboxMin) * 0.1f);
+
+	glmlv::loadObj(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj",loadedScene, true);
 
     // VBO Init (vertex buffer)
     glGenBuffers(1, &cubeVBO);
@@ -392,13 +402,14 @@ Application::Application(int argc, char** argv):
 
     glGenBuffers(1, &dirLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData, GL_DYNAMIC_COPY);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingIndex, dirLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+
     glGenBuffers(1, &pointLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData, GL_DYNAMIC_COPY);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingIndex, pointLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -411,6 +422,7 @@ Application::Application(int argc, char** argv):
         reserveImage(m_nWindowWidth, m_nWindowHeight, gBufferTextures[i], m_GBufferTextureFormat[i]);
         glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, gBufferTextures[i], 0);
     }
+
     displayBuffer[i] = false;
     reserveImage(m_nWindowWidth, m_nWindowHeight, gBufferTextures[i], m_GBufferTextureFormat[i]);
     glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gBufferTextures[i], 0);
@@ -419,8 +431,9 @@ Application::Application(int argc, char** argv):
                              GL_COLOR_ATTACHMENT2,
                              GL_COLOR_ATTACHMENT3,
                              GL_COLOR_ATTACHMENT4 };
+
     glDrawBuffers(5, drawBuffers);
-    GLenum error = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+	error = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
 
     if (error != GL_FRAMEBUFFER_COMPLETE)
     {
@@ -533,7 +546,6 @@ Application::Application(int argc, char** argv):
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
-
 
     loadImage("sample_metalTexture.jpg", metalTexture);
     loadImage("sample_woodTexture.jpg", woodTexture);

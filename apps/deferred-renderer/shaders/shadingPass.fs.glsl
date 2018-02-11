@@ -1,4 +1,7 @@
 #version 430
+#ifdef GL_ES
+precision mediump float;
+#endif
 
 uniform sampler2D uGPosition;
 uniform sampler2D uGNormal;

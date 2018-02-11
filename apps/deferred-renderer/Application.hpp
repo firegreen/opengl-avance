@@ -66,8 +66,8 @@ private:
     void loadImage(std::string filename, GLuint &textureID);
     void loadImage(const glmlv::Image2DRGBA &image, GLuint &textureID);
 
-    const size_t m_nWindowWidth = 1280;
-    const size_t m_nWindowHeight = 720;
+	const int m_nWindowWidth = 800;
+	const int m_nWindowHeight = 450;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
 
     const glmlv::fs::path m_AppPath;

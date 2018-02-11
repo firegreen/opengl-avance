@@ -1,4 +1,7 @@
 #version 430
+#ifdef GL_ES
+precision mediump float;
+#endif
 
 in vec3 vViewSpacePosition;
 in vec3 vViewSpaceNormal;
@@ -45,7 +48,7 @@ void main()
 
     float shin = uShininess;
     if (uUseShinTexture)
-        shin *= vec3(texture(uKshinSampler, vTexCoords.xy));
+		shin *= vec3(texture(uKshinSampler, vTexCoords.xy)).r;
 
     fGlossyShininess = vec4(specular,shin);
 }
