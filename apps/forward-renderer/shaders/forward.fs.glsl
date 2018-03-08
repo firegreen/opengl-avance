@@ -1,4 +1,7 @@
 #version 430
+#ifdef GL_ES
+precision mediump float;
+#endif
 
 in vec3 vViewSpacePosition;
 in vec3 vViewSpaceNormal;

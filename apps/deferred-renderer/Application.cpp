@@ -402,14 +402,16 @@ Application::Application(int argc, char** argv):
 
     glGenBuffers(1, &dirLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData,
+					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingIndex, dirLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 
     glGenBuffers(1, &pointLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
-	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData,
+					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingIndex, pointLightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 

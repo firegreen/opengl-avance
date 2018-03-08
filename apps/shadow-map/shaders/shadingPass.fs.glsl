@@ -1,4 +1,7 @@
 #version 430
+#ifdef GL_ES
+precision mediump float;
+#endif
 
 uniform sampler2D uGPosition;
 uniform sampler2D uGNormal;
@@ -14,6 +17,8 @@ uniform vec3 uPointLightIntensity;
 uniform vec3 uAmbiantLightIntensity;
 
 uniform sampler2DArray uDirLightShadowMap;
+
+uniform float uShadowMapBias;
 
 uniform bool uCastShadow;
 
@@ -40,7 +45,7 @@ struct DirectionnalLightShadow
 
 layout (std430, binding=3) buffer bShadowData
 {
-    DirectionnalLightShadow shadows[];
+	mat4 shadowLightViewProjMatrix[];
 };
 
 layout (std430, binding=2) buffer bPointLightData
@@ -93,25 +98,28 @@ void main()
     vec3 ambient = vec3(texelFetch(uGAmbient, ivec2(gl_FragCoord.xy), 0));
     vec4 shininess = texelFetch(uGlossyShininess, ivec2(gl_FragCoord.xy), 0);
 
-
-
-    vec3 color = directionalColor(uDirectionalLightIntensity, uDirectionalLightDir, normal, diffuse, shininess) +
+	vec3 color = directionalColor(uDirectionalLightIntensity, uDirectionalLightDir, normal, diffuse, shininess) +
                  pointColor(uPointLightIntensity, uPointLightPosition, position, normal, diffuse, shininess) +
                  ambiantColor(uAmbiantLightIntensity, ambient);
-    color = vec3(0,0,0);
-    for (int i=0; i<dirLights.length();++i)
+	for (int i=0; i<dirLights.length();++i)
     {
-        vec4 positionInDirLightScreen = shadows[i].lightViewProjMatrix * vec4(position, 1);
-        vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
-        float depthBlockerInDirSpace = texelFetch(uDirLightShadowMap, ivec3(positionInDirLightNDC.xy,i), 0).r;
-        float dirLightVisibility = positionInDirLightNDC.z < depthBlockerInDirSpace + shadows[i].shadowMapBias ? 1.0 : 0.0;
-        if (!uCastShadow || dirLightVisibility > 0.0)
-            color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess) * dirLightVisibility;
-        color = vec3(position);
-    }
-
+		if (uCastShadow)
+		{
+			vec4 positionInDirLightScreen = shadowLightViewProjMatrix[i] * vec4(position, 1);
+			vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
+			float depthBlockerInDirSpace = texture(uDirLightShadowMap, vec3(positionInDirLightNDC.xy,i), 0).r;
+			float dirLightVisibility = (positionInDirLightNDC.z < (depthBlockerInDirSpace + uShadowMapBias)) ? 1.0 : 0.0;
+			if (dirLightVisibility > 0.0)
+				color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess)
+						* dirLightVisibility;
+		}
+		else
+		{
+			color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess);
+		}
+	}
     //for (int i=0; i<pointLights.length();++i)
         //color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
 
-    fColor = color;
+	fColor = color;
 }

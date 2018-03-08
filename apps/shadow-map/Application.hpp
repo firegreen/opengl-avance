@@ -56,7 +56,7 @@ struct DirectionnalLightShadow
 
     GLuint layer = 0;
     GLuint FBO = 0;
-    int32_t resolution = 512;
+	int32_t resolution = 1024;
     bool isDirty = true;
 
     DirectionnalLightShadowData data;
@@ -69,6 +69,15 @@ struct DirectionnalLightShadow
             reserve3DImage(resolution, resolution, DIR_MAX_SHADOW_COUNT, textures, GL_DEPTH_COMPONENT32F);
             textureCount = 0;
         }
+		if (!sampler)
+		{
+			glGenSamplers(1, &sampler);
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAX_LEVEL, 2);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		}
 
         layer = textureCount;
         ++textureCount;
@@ -84,15 +93,6 @@ struct DirectionnalLightShadow
         if (error != GL_FRAMEBUFFER_COMPLETE)
         {
             std::cerr << "Aie aie aie gro, frame buffer status returns error: " << error << std::endl;
-        }
-
-        if (!sampler)
-        {
-            glGenSamplers(1, &sampler);
-            glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-            glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         }
 
         data.shadowMapLayer = layer;
@@ -129,13 +129,14 @@ public:
 
     int run();
 
-    const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+	const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F,
+																 GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
 
 private:
     void loadImage(std::string filename, GLuint &textureID);
 
-    const size_t m_nWindowWidth = 1280;
-    const size_t m_nWindowHeight = 720;
+	const size_t m_nWindowWidth = 1200;
+	const size_t m_nWindowHeight = 700;
     glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
 
     const glmlv::fs::path m_AppPath;
@@ -149,6 +150,8 @@ private:
     glmlv::GLProgram geometryProgram;
     glmlv::GLProgram shadingProgram;
     glmlv::GLProgram shadowProgram;
+	glmlv::GLProgram depthProgram;
+
 
     GLuint cubeVBO = 0;
     GLuint cubeVAO = 0;
@@ -211,12 +214,15 @@ private:
     GLuint uGAmbient;
     GLuint uGDiffuse;
     GLuint uGlossyShininess;
+	GLuint uGDepth;
+	GLuint samplerBuffer;
 
     GLuint uCastShadow;
 
     GLuint uDirLightShadowMap;
 
     GLuint uDirLightViewProjMatrixShadow;
+	GLuint uShadowMapBias;
 
     GLuint bDirLightData;
     GLuint bPointLightData;
