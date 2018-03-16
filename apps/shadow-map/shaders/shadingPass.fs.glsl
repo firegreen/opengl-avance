@@ -16,8 +16,6 @@ uniform vec3 uPointLightPosition;
 uniform vec3 uPointLightIntensity;
 uniform vec3 uAmbiantLightIntensity;
 
-uniform sampler2DArray uDirLightShadowMap;
-
 uniform float uShadowMapBias;
 
 uniform bool uCastShadow;
@@ -42,6 +40,8 @@ struct DirectionnalLightShadow
     int shadowMapLayer;
     float shadowMapBias;
 };
+
+uniform sampler2DArray uDirLightShadowMap;
 
 layout (std430, binding=3) buffer bShadowData
 {
@@ -117,7 +117,9 @@ void main()
 		{
 			color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess);
 		}
+		//color = vec3(100, 0,0) * shadowLightViewProjMatrix[i][int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
 	}
+
     //for (int i=0; i<pointLights.length();++i)
         //color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
 

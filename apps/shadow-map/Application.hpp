@@ -15,6 +15,7 @@ void reserveImage(const size_t width, const size_t height, GLuint &textureID, GL
 void loadTexture(const glmlv::Image2DRGBA &image, GLuint &textureID);
 
 const glm::vec3 computeDirectionVectorUp(float phiRadians, float thetaRadians);
+void checkGlError();
 
 struct PointLight
 {
@@ -74,9 +75,9 @@ struct DirectionnalLightShadow
 			glGenSamplers(1, &sampler);
 			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glSamplerParameteri(sampler, GL_TEXTURE_MAX_LEVEL, 2);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			checkGlError();
 		}
 
         layer = textureCount;
@@ -88,6 +89,7 @@ struct DirectionnalLightShadow
         glFramebufferTextureLayer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textures, 0, layer);
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		checkGlError();
 
         GLenum error = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
         if (error != GL_FRAMEBUFFER_COMPLETE)

@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glmlv/imgui_impl_glfw_gl3.hpp>
 #include <glmlv/simple_geometry.hpp>
+#include <GL/glu.h>
 
 const int DirectionnalLightShadowData::DIR_SHADOW_TEXTURE_UNIT_OFFSET = 15;
 const int DirectionnalLightShadow::DIR_MAX_SHADOW_COUNT = 10;
@@ -22,6 +23,26 @@ const glm::vec3 computeDirectionVectorUp(float phiRadians, float thetaRadians)
 	return -glm::normalize(glm::vec3(sinPhi * cosTheta, -glm::sin(thetaRadians), cosPhi * cosTheta));
 }
 
+void checkGlError()
+{
+	GLenum error = glGetError();
+	while (error != GL_NO_ERROR)
+	{
+		std::string msg;
+		switch(error) {
+		case GL_INVALID_OPERATION:      msg="INVALID_OPERATION";      break;
+		case GL_INVALID_ENUM:           msg="INVALID_ENUM";           break;
+		case GL_INVALID_VALUE:          msg="INVALID_VALUE";          break;
+		case GL_OUT_OF_MEMORY:          msg="OUT_OF_MEMORY";          break;
+		case GL_INVALID_FRAMEBUFFER_OPERATION:  msg="INVALID_FRAMEBUFFER_OPERATION";  break;
+		}
+		std::cerr << "Error has occured : " << error << " (" << msg << ", "
+				  << gluErrorString(error) <<")" << std::endl;
+
+		error = glGetError();
+	}
+}
+
 int Application::run()
 {
 	float clearColor[3] = { 0, 0, 0 };
@@ -35,10 +56,10 @@ int Application::run()
 	GLuint64 startTime, stopTime;
 	GLuint queryID[20];
 
-	glGenQueries(2, queryID);
+	glGenQueries(20, queryID);
 	// Loop until the user closes the window
 	glEnable(GL_DEPTH_TEST);
-
+	checkGlError();
 	dirLightData.push_back(DirectionnalLight(glm::vec4(0.4,0.2,0.2,1),glm::normalize(glm::vec4(1,-0.7,0,0))));
 	dirLightData.push_back(DirectionnalLight(glm::vec4(0.8,0.8,0.8,1),glm::normalize(glm::vec4(0.3,-0.5,0.1,0))));
 	pointLightData.push_back(PointLight(glm::vec4(20,50,30,1),glm::vec4(1,1,-1,0)));
@@ -52,10 +73,16 @@ int Application::run()
 	GLvoid* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
 	memcpy(p, dirLightData.data(), sizeof(DirectionnalLight)*dirLightData.size());
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 	p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
 	memcpy(p, pointLightData.data(), sizeof(PointLight)*pointLightData.size());
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	checkGlError();
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowSSBO);
+	glm::mat4* shadowPtr = (glm::mat4*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, sizeof(glm::mat4)*2, GL_MAP_WRITE_BIT);
 
 	for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
 	{
@@ -69,7 +96,7 @@ int Application::run()
 					m_nWindowWidth / (float)m_nWindowHeight,
 					0.01f * sceneDiag,              // Near clipping plane. Keep as big as possible, or you'll get precision issues.
 					1.0f * sceneDiag            // Far clipping plane. Keep as little as possible.
-					);
+		);
 		glm::mat4 viewMat = camera.getViewMatrix();
 
 		glm::mat4 cubeModelMat = glm::rotate(
@@ -83,7 +110,7 @@ int Application::run()
 		double start = glfwGetTime();
 		glQueryCounter(queryID[0], GL_TIMESTAMP);
 		std::cout << "========= Shadow map process =========" << std::endl;
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowSSBO);
+
 		for (int i=0; i< dirLightData.size(); ++i)
 		{
 			DirectionnalLightShadow& shadow = dirLightShadows[i];
@@ -129,13 +156,15 @@ int Application::run()
 
 				shadow.data.lightViewProjMatrix = shadow.data.lightViewProjMatrix * camera.getRcpViewMatrix();
 
-				glBufferSubData(GL_SHADER_STORAGE_BUFFER, i*sizeof(glm::mat4), sizeof(glm::mat4),
-								(void*) &shadow.data.lightViewProjMatrix[0][0]);
+				memcpy(shadowPtr+i, (void*) &shadow.data.lightViewProjMatrix[0][0], sizeof(glm::mat4));
+
 				shadow.isDirty = false;
 			}
 		}
+
 		glQueryCounter(queryID[1], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
 
 		std::cout << "========= Geometry pass process =========" << std::endl;
 		glQueryCounter(queryID[2], GL_TIMESTAMP);
@@ -273,6 +302,7 @@ int Application::run()
 		}
 		glQueryCounter(queryID[3], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
 
 		std::cout << "========= Shading pass process =========" << std::endl;
 		glQueryCounter(queryID[4], GL_TIMESTAMP);
@@ -340,6 +370,7 @@ int Application::run()
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
 		glQueryCounter(queryID[5], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
 
 		glQueryCounter(queryID[6], GL_TIMESTAMP);
 		start = glfwGetTime();
@@ -361,6 +392,7 @@ int Application::run()
 		}
 		glQueryCounter(queryID[7], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
 
 
 		width = m_nWindowWidth; height = m_nWindowHeight;
@@ -430,6 +462,7 @@ int Application::run()
 		ImGui::Render();
 		glQueryCounter(queryID[9], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
 
 		/* Poll for and process events */
 		glfwPollEvents();
@@ -439,33 +472,20 @@ int Application::run()
 		std::cout << "========= Swap Buffers =========" << std::endl;
 		start = glfwGetTime();
 		m_GLFWHandle.swapBuffers();
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+		shadowPtr = (glm::mat4*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, sizeof(glm::mat4)*2, GL_MAP_WRITE_BIT );
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
-
-		GLint stopTimerAvailable = 0;
-		while (!stopTimerAvailable) {
-			glGetQueryObjectiv(queryID[9], GL_QUERY_RESULT_AVAILABLE,  &stopTimerAvailable);
-		}
-
-		std::cout << "========= GPU TIMES =========" << std::endl;
-		for (int k=0; k<=8;k+=2)
-		{
-			// get query results
-			glGetQueryObjectui64v(queryID[k], GL_QUERY_RESULT, &startTime);
-			glGetQueryObjectui64v(queryID[k+1], GL_QUERY_RESULT, &stopTime);
-
-			printf("%f ms\n", (stopTime - startTime) / 1000000.0);
-		}
-		std::cout << "=============================" << std::endl;
+		checkGlError();
 
 
 		auto ellapsedTime = glfwGetTime() - seconds;
 		std::cout << "========= Shadow map update =========" << std::endl;
 		start = glfwGetTime();
+		glQueryCounter(queryID[10], GL_TIMESTAMP);
 		auto guiHasFocus = ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard;
 		if (!guiHasFocus) {
 			if(camera.update(float(ellapsedTime)))
 			{
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowSSBO);
 				for (int i=0; i< dirLightData.size(); ++i)
 				{
 					DirectionnalLightShadow& shadow = dirLightShadows[i];
@@ -481,8 +501,7 @@ int Application::run()
 
 					shadow.data.lightViewProjMatrix = dirLightProjMatrix * dirLightViewMatrix * camera.getRcpViewMatrix();
 
-					glBufferSubData(GL_SHADER_STORAGE_BUFFER, i*sizeof(float)*16, sizeof(float)*16,
-									(void*) &shadow.data.lightViewProjMatrix[0][0]);
+					memcpy(shadowPtr+i, (void*) &shadow.data.lightViewProjMatrix[0][0], sizeof(glm::mat4));
 					//shadow.isDirty = true;
 				}
 			}
@@ -493,7 +512,25 @@ int Application::run()
 				depthProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "shadingPass.vs.glsl", m_ShadersRootPath / m_AppName / "depth.fs.glsl" });
 			}
 		}
+		glQueryCounter(queryID[11], GL_TIMESTAMP);
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl << std::endl << std::endl;
+		checkGlError();
+
+		GLint stopTimerAvailable = 0;
+		while (!stopTimerAvailable) {
+			glGetQueryObjectiv(queryID[9], GL_QUERY_RESULT_AVAILABLE,  &stopTimerAvailable);
+		}
+
+		std::cout << "========= GPU TIMES =========" << std::endl;
+		for (int k=0; k<=10;k+=2)
+		{
+			// get query results
+			glGetQueryObjectui64v(queryID[k], GL_QUERY_RESULT, &startTime);
+			glGetQueryObjectui64v(queryID[k+1], GL_QUERY_RESULT, &stopTime);
+
+			//printf("%f ms\n", (stopTime - startTime) / 1000000.0);
+		}
+		std::cout << "=============================" << std::endl;
 	}
 
 	return 0;
@@ -507,6 +544,7 @@ void loadTexture(const glmlv::Image2DRGBA& image, GLuint& textureID)
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, image.width(), image.height());
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width(), image.height(), GL_RGBA, GL_UNSIGNED_BYTE, image.data());
 	glBindTexture(GL_TEXTURE_2D, 0);
+	checkGlError();
 }
 
 void reserveImage(const size_t width, const size_t height, GLuint& textureID, GLenum format)
@@ -516,6 +554,7 @@ void reserveImage(const size_t width, const size_t height, GLuint& textureID, GL
 	glBindTexture(GL_TEXTURE_2D, textureID);
 	glTexStorage2D(GL_TEXTURE_2D, 1, format, width, height);
 	glBindTexture(GL_TEXTURE_2D, 0);
+	checkGlError();
 }
 
 
@@ -525,6 +564,7 @@ void reserve3DImage(const size_t width, const size_t height, const size_t nbLaye
 	glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, format, width, height, nbLayer);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+	checkGlError();
 }
 
 
@@ -589,14 +629,14 @@ Application::Application(int argc, char** argv):
 	glGenBuffers(1, &dirLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*2, &dirLightData,
-					GL_MAP_WRITE_BIT);
+					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingIndex, dirLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	glGenBuffers(1, &pointLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*1, &pointLightData,
-					GL_MAP_WRITE_BIT);
+					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingIndex, pointLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -604,10 +644,12 @@ Application::Application(int argc, char** argv):
 	glGenBuffers(1, &shadowSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowSSBO);
 	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(glm::mat4)*2, &_shadowData[0][0],
-					GL_MAP_WRITE_BIT);
+					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingIndex, shadowSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-	GLenum error = glGetError();
+	GLenum error;
+
+	checkGlError();
 
 
 	glGenFramebuffers(1, &FBO);
@@ -636,6 +678,8 @@ Application::Application(int argc, char** argv):
 	}
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+	checkGlError();
 
 	// Here we load and compile shaders from the library
 	geometryProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "geometryPass.vs.glsl", m_ShadersRootPath / m_AppName / "geometryPass.fs.glsl" });
@@ -774,6 +818,8 @@ Application::Application(int argc, char** argv):
 	glGenSamplers(1, &samplerBuffer);
 	glSamplerParameteri(samplerBuffer, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glSamplerParameteri(samplerBuffer, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	checkGlError();
 }
 
 Application::~Application()
