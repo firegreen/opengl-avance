@@ -50,8 +50,8 @@ struct DirectionnalLightShadowData
 
 struct DirectionnalLightShadow
 {
-    static const int DIR_MAX_SHADOW_COUNT;
-    static GLuint textures;
+	static const unsigned int DIR_MAX_SHADOW_COUNT;
+	static GLuint* textures;
     static GLuint textureCount;
     static GLuint sampler;
 
@@ -67,16 +67,21 @@ struct DirectionnalLightShadow
     {
         if (!textures)
         {
-            reserve3DImage(resolution, resolution, DIR_MAX_SHADOW_COUNT, textures, GL_DEPTH_COMPONENT32F);
+			textures = new GLuint[DirectionnalLightShadow::DIR_MAX_SHADOW_COUNT];
+
+			for(int i=0; i<DIR_MAX_SHADOW_COUNT; ++i)
+				reserveImage(resolution, resolution, textures[i], GL_DEPTH_COMPONENT32F);
             textureCount = 0;
         }
 		if (!sampler)
 		{
 			glGenSamplers(1, &sampler);
-			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE); // Cette ligne
+			glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL); // Et celle ci
 			checkGlError();
 		}
 
@@ -86,7 +91,7 @@ struct DirectionnalLightShadow
         glGenFramebuffers(1, &FBO);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
 
-        glFramebufferTextureLayer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textures, 0, layer);
+		glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textures[layer], 0);
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		checkGlError();
@@ -136,6 +141,7 @@ public:
 
 private:
     void loadImage(std::string filename, GLuint &textureID);
+	void loadSkybox(std::string foldername, std::string ext, GLuint &textureID);
 
 	const size_t m_nWindowWidth = 1200;
 	const size_t m_nWindowHeight = 700;
@@ -153,6 +159,7 @@ private:
     glmlv::GLProgram shadingProgram;
     glmlv::GLProgram shadowProgram;
 	glmlv::GLProgram depthProgram;
+	glmlv::GLProgram skyboxProgram;
 
 
     GLuint cubeVBO = 0;
@@ -170,6 +177,10 @@ private:
     GLuint quadVBO = 0;
     GLuint quadVAO = 0;
 
+	GLuint skyboxVBO = 0;
+	GLuint skyboxVAO = 0;
+	GLuint skyboxIBO = 0;
+
     GLuint FBO = 0;
 
     std::vector<DirectionnalLight> dirLightData;
@@ -177,14 +188,19 @@ private:
     std::vector<PointLight> pointLightData;
     GLuint dirLightSSBO = 0;
     GLuint pointLightSSBO = 0;
-    GLuint shadowSSBO = 0;
+	GLuint shadowSSBO = 0;
+	GLuint shadowTexturesSSBO = 0;
 
     GLuint uModelViewProjMatrix = 0;
     GLuint uModelViewMatrix = 0;
     GLuint uNormalMatrix = 0;
 
+	GLuint uSkyProjMatrix = 0;
+	GLuint uSkyViewMatrix = 0;
+
     GLuint metalTexture = 0;
     GLuint woodTexture = 0;
+	GLuint skyboxTexture = 0;
     std::vector<GLuint> sceneTextures;
 
     GLuint uDirectionalLightDir;
@@ -209,7 +225,9 @@ private:
     GLuint uKspecSampler;
     GLuint uKshinSampler;
     GLuint uNormalSampler;
-    GLuint samplerObject;
+	GLuint samplerObject;
+
+	GLuint uSkyboxSampler;
 
     GLuint uGPosition;
     GLuint uGNormal;
@@ -226,10 +244,13 @@ private:
     GLuint uDirLightViewProjMatrixShadow;
 	GLuint uShadowMapBias;
 
+	GLuint uShadowLightMap;
+
     GLuint bDirLightData;
     GLuint bPointLightData;
 
     glmlv::SimpleGeometry cube;
+	glmlv::SimpleGeometry skyCube;
     glmlv::SimpleGeometry sphere;
     glmlv::ObjData loadedScene;
 
