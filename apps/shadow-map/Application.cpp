@@ -440,7 +440,7 @@ int Application::run()
 		start = glfwGetTime();
 		m_GLFWHandle.swapBuffers();
 		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
-
+		/*
 		GLint stopTimerAvailable = 0;
 		while (!stopTimerAvailable) {
 			glGetQueryObjectiv(queryID[9], GL_QUERY_RESULT_AVAILABLE,  &stopTimerAvailable);
@@ -457,7 +457,7 @@ int Application::run()
 		}
 		std::cout << "=============================" << std::endl;
 
-
+		*/
 		auto ellapsedTime = glfwGetTime() - seconds;
 		std::cout << "========= Shadow map update =========" << std::endl;
 		start = glfwGetTime();
