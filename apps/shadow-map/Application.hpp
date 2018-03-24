@@ -247,6 +247,10 @@ private:
 
 	GLuint uShadowLightMap;
 
+	GLuint uFogColor;
+	GLuint uFogDistance;
+	GLuint uFogDensity;
+
     GLuint bDirLightData;
     GLuint bPointLightData;
 

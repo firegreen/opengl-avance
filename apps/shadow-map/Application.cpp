@@ -56,11 +56,15 @@ int Application::run()
 	GLuint64 startTime, stopTime;
 	GLuint queryID[20];
 
+	float fogColor[] = { 1.f, 1.f, 1.f };
+	float fogDistance = 0.95f;
+	float fogDensity = 0.01f;
+
 	glGenQueries(20, queryID);
 	// Loop until the user closes the window
 	checkGlError();
-	dirLightData.push_back(DirectionnalLight(glm::vec4(0.8,0.8,0.8,1),glm::normalize(glm::vec4(-0.3,-0.7,-0.2,0))));
-	dirLightData.push_back(DirectionnalLight(glm::vec4(0.3,0.3,0.1,1),glm::normalize(glm::vec4(0.3,-0.5,0.1,0))));
+	dirLightData.push_back(DirectionnalLight(glm::vec4(0.2,0.2,0.2,1),glm::normalize(glm::vec4(-0.3,-0.7,-0.2,0))));
+	dirLightData.push_back(DirectionnalLight(glm::vec4(0.8,0.8,0.8,1),glm::normalize(glm::vec4(0.3,-0.5,0.1,0))));
 	pointLightData.push_back(PointLight(glm::vec4(20,50,30,1),glm::vec4(1,1,-1,0)));
 
 	dirLightShadows.resize(dirLightData.size());
@@ -367,6 +371,10 @@ int Application::run()
 		glProgramUniform1i(depthProgram.glId(),uGDepth, 5);
 		glProgramUniform1i(shadingProgram.glId(), uGShadingDepth, 5);
 
+		glProgramUniform3fv(shadingProgram.glId(), uFogColor, 1, fogColor);
+		glProgramUniform1f(shadingProgram.glId(), uFogDistance, fogDistance);
+		glProgramUniform1f(shadingProgram.glId(), uFogDensity, fogDensity);
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDiffuse]);
 		glActiveTexture(GL_TEXTURE1);
@@ -552,12 +560,12 @@ int Application::run()
 		checkGlError();
 
 		GLint stopTimerAvailable = 0;
-		/*while (!stopTimerAvailable) {
+		while (!stopTimerAvailable) {
 			glGetQueryObjectiv(queryID[9], GL_QUERY_RESULT_AVAILABLE,  &stopTimerAvailable);
-		}*/
+		}
 
 		std::cout << "========= GPU TIMES =========" << std::endl;
-		/*
+		
 		for (int k=0; k<=10;k+=2)
 		{
 			// get query results
@@ -566,7 +574,7 @@ int Application::run()
 
 			printf("%f ms\n", (stopTime - startTime) / 1000000.0);
 		}
-		*/
+		
 		std::cout << "=============================" << std::endl;
 	}
 
@@ -839,6 +847,10 @@ Application::Application(int argc, char** argv):
 	uDirLightViewProjMatrixShadow = glGetUniformLocation(shadowProgram.glId(), "uDirLightViewProjMatrix");
 	uShadowMapBias = glGetUniformLocation(shadingProgram.glId(), "uShadowMapBias");
 	uShadowLightMap = glGetUniformLocation(shadingProgram.glId(), "uShadowLightMap");
+
+	uFogColor = glGetUniformLocation(shadingProgram.glId(), "uFogColor");
+	uFogDistance = glGetUniformLocation(shadingProgram.glId(), "uFogDistance");
+	uFogDensity = glGetUniformLocation(shadingProgram.glId(), "uFogDensity");
 
 	glBindVertexArray(cubeVAO);
 

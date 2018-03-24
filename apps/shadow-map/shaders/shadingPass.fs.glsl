@@ -23,6 +23,10 @@ uniform float uShadowMapBias;
 
 uniform bool uCastShadow;
 
+uniform vec3 uFogColor;
+uniform float uFogDistance;
+uniform float uFogDensity;
+
 out vec3 fColor;
 
 uniform sampler2DShadow uShadowLightMap[10];
@@ -177,6 +181,12 @@ void main()
 		for (int i=0; i<pointLights.length();++i)
 			color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
 
+		color = mix(
+			color,
+			uFogColor,
+			pow(depth, 1.f / uFogDensity) / uFogDistance
+		);
+		
 		fColor = color;
 	}
 }
