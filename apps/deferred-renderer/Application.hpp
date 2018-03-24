@@ -59,7 +59,8 @@ public:
 
     int run();
 
-    const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+	const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F,
+																 GL_RGB32F, GL_RGBA32F, GL_DEPTH24_STENCIL8 };
 
 private:
     void reserveImage(const size_t width, const size_t height, GLuint &textureID, GLenum format = GL_RGB32F);

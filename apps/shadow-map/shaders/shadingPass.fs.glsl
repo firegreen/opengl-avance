@@ -8,6 +8,9 @@ uniform sampler2D uGNormal;
 uniform sampler2D uGAmbient;
 uniform sampler2D uGDiffuse;
 uniform sampler2D uGlossyShininess;
+uniform sampler2D uGShadingDepth;
+
+uniform samplerCube uSkyboxSampler;
 
 uniform vec3 uDirectionalLightDir;
 uniform vec3 uDirectionalLightIntensity;
@@ -114,58 +117,66 @@ vec3 ambiantColor(vec3 lightColor, vec3 uKa)
 
 void main()
 {
+	float depth = texelFetch(uGShadingDepth, ivec2(gl_FragCoord.xy), 0).r;
 	vec3 position = vec3(texelFetch(uGPosition, ivec2(gl_FragCoord.xy), 0));
-    vec3 normal = normalize(vec3(texelFetch(uGNormal, ivec2(gl_FragCoord.xy), 0)));
-    vec3 diffuse = vec3(texelFetch(uGDiffuse, ivec2(gl_FragCoord.xy), 0));
-    vec3 ambient = vec3(texelFetch(uGAmbient, ivec2(gl_FragCoord.xy), 0));
-    vec4 shininess = texelFetch(uGlossyShininess, ivec2(gl_FragCoord.xy), 0);
-
-	vec3 color = directionalColor(uDirectionalLightIntensity, uDirectionalLightDir, normal, diffuse, shininess) +
-                 pointColor(uPointLightIntensity, uPointLightPosition, position, normal, diffuse, shininess) +
-                 ambiantColor(uAmbiantLightIntensity, ambient);
-	for (int i=0; i<dirLights.length();++i)
-    {
-		if (uCastShadow)
-		{
-			vec4 positionInDirLightScreen = shadowLightViewProjMatrix[i] * vec4(position, 1);
-			vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
-			float dirLightVisibility = textureProj(uShadowLightMap[i],
-													vec4(positionInDirLightNDC.xy,
-														positionInDirLightNDC.z - uShadowMapBias, 1.0),
-													0);
-			if (dirLightVisibility > 0.0)
-			{
-				for (int i = 0; i < 3; ++i)
-				{
-					// Noisy shadows:
-					int index = int(dot(gl_FragCoord.xy, position.xy)*(i+1)+
-									int(gl_FragCoord.x) % (i+1)+
-									int(gl_FragCoord.y) % (i+1)+
-									position.z * i) % 16;
-
-					dirLightVisibility += textureProj(uShadowLightMap[i],
-													  vec4(positionInDirLightNDC.xy + 0.0002 * poissonDisk[index],
-														   positionInDirLightNDC.z - uShadowMapBias, 1.0),
-													  0.0);
-				}
-				dirLightVisibility *= 0.25;
-				color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess)
-						* dirLightVisibility;
-			}
-			//color = dirLightVisibility * vec3(1,1,0);
-		}
-		else
-		{
-			color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess);
-		}
-		//color = vec3(100, 0,0) * shadowLightViewProjMatrix[i][int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
-
-		//if (gl_FragCoord.x < 700 && gl_FragCoord.y < 700)
-			//color += vec3(texelFetch(uShadowLightMap[i], ivec2(gl_FragCoord.xy), 0));
+	if (depth >= 1.0)
+	{
+		fColor = texture(uSkyboxSampler, position).xyz;
 	}
+	else
+	{
+		vec3 normal = normalize(vec3(texelFetch(uGNormal, ivec2(gl_FragCoord.xy), 0)));
+		vec3 diffuse = vec3(texelFetch(uGDiffuse, ivec2(gl_FragCoord.xy), 0));
+		vec3 ambient = vec3(texelFetch(uGAmbient, ivec2(gl_FragCoord.xy), 0));
+		vec4 shininess = texelFetch(uGlossyShininess, ivec2(gl_FragCoord.xy), 0);
 
-	for (int i=0; i<pointLights.length();++i)
-		color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
+		vec3 color = directionalColor(uDirectionalLightIntensity, uDirectionalLightDir, normal, diffuse, shininess) +
+					 pointColor(uPointLightIntensity, uPointLightPosition, position, normal, diffuse, shininess) +
+					 ambiantColor(uAmbiantLightIntensity, ambient);
+		for (int i=0; i<dirLights.length();++i)
+		{
+			if (uCastShadow)
+			{
+				vec4 positionInDirLightScreen = shadowLightViewProjMatrix[i] * vec4(position, 1);
+				vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
+				float dirLightVisibility = textureProj(uShadowLightMap[i],
+														vec4(positionInDirLightNDC.xy,
+															positionInDirLightNDC.z - uShadowMapBias, 1.0),
+														0);
+				if (dirLightVisibility > 0.0)
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						// Noisy shadows:
+						int index = int(dot(gl_FragCoord.xy, position.xy)*(i+1)+
+										int(gl_FragCoord.x) % (i+1)+
+										int(gl_FragCoord.y) % (i+1)+
+										position.z * i) % 16;
 
-	fColor = color;
+						dirLightVisibility += textureProj(uShadowLightMap[i],
+														  vec4(positionInDirLightNDC.xy + 0.0002 * poissonDisk[index],
+															   positionInDirLightNDC.z - uShadowMapBias, 1.0),
+														  0.0);
+					}
+					dirLightVisibility *= 0.25;
+					color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess)
+							* dirLightVisibility;
+				}
+				//color = dirLightVisibility * vec3(1,1,0);
+			}
+			else
+			{
+				color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess);
+			}
+			//color = vec3(100, 0,0) * shadowLightViewProjMatrix[i][int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
+
+			//if (gl_FragCoord.x < 700 && gl_FragCoord.y < 700)
+				//color += vec3(texelFetch(uShadowLightMap[i], ivec2(gl_FragCoord.xy), 0));
+		}
+
+		for (int i=0; i<pointLights.length();++i)
+			color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
+
+		fColor = color;
+	}
 }

@@ -58,7 +58,6 @@ int Application::run()
 
 	glGenQueries(20, queryID);
 	// Loop until the user closes the window
-	glEnable(GL_DEPTH_TEST);
 	checkGlError();
 	dirLightData.push_back(DirectionnalLight(glm::vec4(0.8,0.8,0.8,1),glm::normalize(glm::vec4(-0.3,-0.7,-0.2,0))));
 	dirLightData.push_back(DirectionnalLight(glm::vec4(0.3,0.3,0.1,1),glm::normalize(glm::vec4(0.3,-0.5,0.1,0))));
@@ -119,13 +118,10 @@ int Application::run()
 				 glm::vec3(0.5f,1,1));
 		glm::mat4 sceneModelMat = glm::mat4();
 
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
 		double start = glfwGetTime();
 		glQueryCounter(queryID[0], GL_TIMESTAMP);
 		std::cout << "========= Shadow map process =========" << std::endl;
-
+		glEnable(GL_DEPTH_TEST);
 		for (int i=0; i< dirLightData.size(); ++i)
 		{
 			DirectionnalLightShadow& shadow = dirLightShadows[i];
@@ -186,8 +182,9 @@ int Application::run()
 		start = glfwGetTime();
 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClear(GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_DEPTH_TEST);
+		glDepthMask(GL_TRUE);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glProgramUniform3f(geometryProgram.glId(),uKd, 1, 1, 1);
 		glProgramUniform3f(geometryProgram.glId(),uKs, 0.2f, 0.2f, 0.2f);
@@ -242,13 +239,28 @@ int Application::run()
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 
+		modelViewMat = glm::mat4(glm::mat3(viewMat)) * glm::scale(glm::mat4(), glm::vec3(80,80,80));
+		modelViewProjMat =  glm::perspective(
+							glm::radians(FoV),
+							m_nWindowWidth / (float)m_nWindowHeight,
+							1.f,
+							90.f
+						) * modelViewMat;
+		glUniformMatrix4fv(uModelViewMatrix,1, GL_FALSE, &glm::mat4()[0][0]);
+		glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &modelViewProjMat[0][0]);
+		glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &glm::mat4()[0][0]);
+
+		glDepthMask(GL_FALSE);
+		glBindVertexArray(skyboxVAO);
+		glDrawElements(GL_TRIANGLES, skyCube.indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
+		glDepthMask(GL_TRUE);
+
 		modelViewMat = viewMat * sceneModelMat;
 		modelViewProjMat = projectionMat * modelViewMat;
 		normalMat = glm::transpose(glm::inverse(modelViewMat));
 		glUniformMatrix4fv(uModelViewMatrix,1, GL_FALSE, &modelViewMat[0][0]);
 		glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &modelViewProjMat[0][0]);
 		glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &normalMat[0][0]);
-
 
 		glBindVertexArray(sceneVAO);
 		uint32_t indexOffset = 0, indexCount;
@@ -321,6 +333,18 @@ int Application::run()
 		std::cout << "========= Shading pass process =========" << std::endl;
 		glQueryCounter(queryID[4], GL_TIMESTAMP);
 		start = glfwGetTime();
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glQueryCounter(queryID[5], GL_TIMESTAMP);
+		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
+		checkGlError();
+
+		glActiveTexture(GL_TEXTURE30);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+		glProgramUniform1i(shadingProgram.glId(), uSkyboxSampler, 30);
+
 		glm::vec4 directionalDir =
 				glm::normalize(viewMat * glm::vec4(dirLightDirection[0],dirLightDirection[1],dirLightDirection[2],0));
 		glProgramUniform3f(shadingProgram.glId(), uDirectionalLightDir,directionalDir.x,directionalDir.y,directionalDir.z);
@@ -332,29 +356,6 @@ int Application::run()
 
 		glProgramUniform3f(shadingProgram.glId(),uAmbiantLightIntensity, ambiantLight[0],ambiantLight[1],ambiantLight[2]);
 
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-		glBlitFramebuffer(0, 0, 20, 20,
-						  0, 0, 20, 20,
-						  GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-		checkGlError();
-
-		glDepthMask(GL_FALSE);
-		skyboxProgram.use();
-		// ... set view and projection matrix
-		glm::mat4 skyViewMat = glm::mat4(glm::mat3(viewMat));
-		glm::mat4 skyProjMat = projectionMat;
-		glProgramUniformMatrix4fv(skyboxProgram.glId(), uSkyViewMatrix, 1, GL_FALSE, &skyViewMat[0][0]);
-		glProgramUniformMatrix4fv(skyboxProgram.glId(), uSkyProjMatrix, 1, GL_FALSE, &skyProjMat[0][0]);
-		glBindVertexArray(skyboxVAO);
-		checkGlError();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
-		glProgramUniform1i(skyboxProgram.glId(), uSkyboxSampler, 0);
-		glDrawElements(GL_TRIANGLES, skyCube.indexBuffer.size(), GL_UNSIGNED_INT, nullptr);
-		glDepthMask(GL_TRUE);
-		checkGlError();
-
 		glProgramUniform1f(shadingProgram.glId(),uShadowMapBias, shadowMapBias);
 		glProgramUniform1i(shadingProgram.glId(), uCastShadow, castShadow);
 
@@ -364,6 +365,7 @@ int Application::run()
 		glProgramUniform1i(shadingProgram.glId(),uGPosition, 3);
 		glProgramUniform1i(shadingProgram.glId(),uGNormal, 4);
 		glProgramUniform1i(depthProgram.glId(),uGDepth, 5);
+		glProgramUniform1i(shadingProgram.glId(), uGShadingDepth, 5);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDiffuse]);
@@ -396,14 +398,14 @@ int Application::run()
 
 		glBindVertexArray(quadVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
-		checkGlError();
-
 		glBindVertexArray(0);
 
+		/*glEnable(GL_DEPTH_TEST);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
-		glQueryCounter(queryID[5], GL_TIMESTAMP);
-		std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
-		checkGlError();
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight,
+						  0, 0, m_nWindowWidth, m_nWindowHeight,
+						  GL_DEPTH_BUFFER_BIT, GL_NEAREST);*/
 
 		glQueryCounter(queryID[6], GL_TIMESTAMP);
 		start = glfwGetTime();
@@ -788,7 +790,7 @@ Application::Application(int argc, char** argv):
 	uNormalMatrix = glGetUniformLocation(geometryProgram.glId(), "uNormalMatrix");
 
 	uSkyProjMatrix = glGetUniformLocation(skyboxProgram.glId(), "uSkyProjMatrix");
-	uSkyViewMatrix = glGetUniformLocation(skyboxProgram.glId(), "uSkyViewMatrix");
+	uSkyMatrix = glGetUniformLocation(shadingProgram.glId(), "uSkyMatrix");
 
 	uKd = glGetUniformLocation(geometryProgram.glId(), "uKd");
 	uKs = glGetUniformLocation(geometryProgram.glId(), "uKs");
@@ -804,13 +806,14 @@ Application::Application(int argc, char** argv):
 	uKspecSampler = glGetUniformLocation(geometryProgram.glId(), "uKspecSampler");
 	uKshinSampler = glGetUniformLocation(geometryProgram.glId(), "uKshinSampler");
 	uNormalSampler = glGetUniformLocation(geometryProgram.glId(), "uNormalSampler");
-	uSkyboxSampler = glGetUniformLocation(skyboxProgram.glId(), "uSkyboxSampler");
 
 	bDirLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
 	glShaderStorageBlockBinding(shadingProgram.glId(), bDirLightData, dirlightBindingIndex);
 
 	bPointLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
 	glShaderStorageBlockBinding(shadingProgram.glId(), bPointLightData, pointlightBindingIndex);
+
+	uSkyboxSampler = glGetUniformLocation(shadingProgram.glId(), "uSkyboxSampler");
 
 	uDirectionalLightDir = glGetUniformLocation(shadingProgram.glId(), "uDirectionalLightDir");
 	uDirectionalLightIntensity = glGetUniformLocation(shadingProgram.glId(), "uDirectionalLightIntensity");
@@ -827,6 +830,7 @@ Application::Application(int argc, char** argv):
 	uGDiffuse = glGetUniformLocation(shadingProgram.glId(), "uGDiffuse");
 	uGlossyShininess = glGetUniformLocation(shadingProgram.glId(), "uGlossyShininess");
 	uGDepth = glGetUniformLocation(depthProgram.glId(), "uGDepth");
+	uGShadingDepth = glGetUniformLocation(shadingProgram.glId(), "uGShadingDepth");
 
 	uDirLightShadowMap = glGetUniformLocation(shadingProgram.glId(), "uDirLightShadowMap");
 
