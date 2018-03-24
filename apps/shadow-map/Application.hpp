@@ -70,7 +70,7 @@ struct DirectionnalLightShadow
 			textures = new GLuint[DirectionnalLightShadow::DIR_MAX_SHADOW_COUNT];
 
 			for(int i=0; i<DIR_MAX_SHADOW_COUNT; ++i)
-				reserveImage(resolution, resolution, textures[i], GL_DEPTH_COMPONENT32F);
+				reserveImage(resolution, resolution, textures[i], GL_DEPTH24_STENCIL8);
             textureCount = 0;
         }
 		if (!sampler)
@@ -137,7 +137,7 @@ public:
     int run();
 
 	const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F,
-																 GL_RGB32F, GL_RGBA32F, GL_DEPTH_COMPONENT32F };
+																 GL_RGB32F, GL_RGBA32F, GL_DEPTH24_STENCIL8 };
 
 private:
     void loadImage(std::string filename, GLuint &textureID);
@@ -196,7 +196,7 @@ private:
     GLuint uNormalMatrix = 0;
 
 	GLuint uSkyProjMatrix = 0;
-	GLuint uSkyViewMatrix = 0;
+	GLuint uSkyMatrix = 0;
 
     GLuint metalTexture = 0;
     GLuint woodTexture = 0;
@@ -235,6 +235,7 @@ private:
     GLuint uGDiffuse;
     GLuint uGlossyShininess;
 	GLuint uGDepth;
+	GLuint uGShadingDepth;
 	GLuint samplerBuffer;
 
     GLuint uCastShadow;
