@@ -19,7 +19,7 @@ void Scene::resetLights(int lightsCount)
 	shadowTextureData.clear();
 	for (int i = 0; i < lightsCount; ++i)
 	{
-		if (qrand()%2)
+		if (rand()%2)
 		{
 			dirLightData.push_back(DirectionnalLight(glm::vec4(0.2 + rand() % 700 * 0.01,
 														   0.2 + rand() % 700 * 0.01,
@@ -31,8 +31,8 @@ void Scene::resetLights(int lightsCount)
 	}
 	for (int i = 0; i < lightsCount; ++i)
 	{
-		if (qrand()%2)
-			pointLightData.push_back(PointLight(glm::vec3(0.2 + rand() % 700 * 0.01,
+		if (rand()%2)
+			pointLightData.push_back(PointLight(glm::vec4(0.2 + rand() % 700 * 0.01,
 														   0.2 + rand() % 700 * 0.01,
 														   0.2 + rand() % 700 * 0.01, 1),
 												glm::vec4(-10 + rand() % 40 * 0.5, -10 + rand() % 40 * 0.5, -10 + rand() % 40 * 0.5,0)));

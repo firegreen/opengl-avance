@@ -1,4 +1,6 @@
-#include <glmlv/GlobalWavPlayer.hpp>
+// Merci Yoan
+
+#include "GlobalWavPlayer.hpp"
 #include <iostream>
 #include <string.h>
 

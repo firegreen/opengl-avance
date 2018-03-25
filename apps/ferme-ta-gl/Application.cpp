@@ -6,6 +6,7 @@
 
 #include <imgui.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glmlv/imgui_impl_glfw_gl3.hpp>
 #include <glmlv/simple_geometry.hpp>
 #include <GL/glu.h>
@@ -103,11 +104,12 @@ int Application::run()
 
 				ImGui::End();
 			}
-		}
 
-		const auto viewportSize = m_GLFWHandle.framebufferSize();
-		glViewport(0, 0, viewportSize.x, viewportSize.y);
-		ImGui::Render();
+			const auto viewportSize = m_GLFWHandle.framebufferSize();
+			glViewport(0, 0, viewportSize.x, viewportSize.y);
+			ImGui::Render();
+		}
+		
 		glQueryCounter(queryID[9], GL_TIMESTAMP);
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
 		checkGlError();
@@ -135,10 +137,10 @@ int Application::run()
 		auto guiHasFocus = ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard;
 		if (!guiHasFocus) {
 			if (glfwGetKey(m_GLFWHandle.window(), GLFW_KEY_P)) {
-				geometryProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "geometryPass.vs.glsl", m_ShadersRootPath / m_AppName / "geometryPass.fs.glsl" });
-				shadingProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "shadingPass.vs.glsl", m_ShadersRootPath / m_AppName / "shadingPass.fs.glsl" });
-				shadowProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "directionalSM.vs.glsl", m_ShadersRootPath / m_AppName / "directionalSM.fs.glsl" });
-				depthProgram = glmlv::compileProgram({ m_ShadersRootPath / m_AppName / "shadingPass.vs.glsl", m_ShadersRootPath / m_AppName / "depth.fs.glsl" });
+				geometryProgram = GeometryProgramHandler(m_ShadersRootPath / m_AppName);
+				shadingProgram = ShadingProgramHandler(m_ShadersRootPath / m_AppName);
+				shadowProgram = ShadowProgramHandler(m_ShadersRootPath / m_AppName);
+				depthProgram = DepthProgramHandler(m_ShadersRootPath / m_AppName);
 			}
 			if (glfwGetKey(m_GLFWHandle.window(), GLFW_KEY_D)) {
 				displayGUI = displayGUI;
@@ -357,11 +359,11 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 	glDrawElements(GL_TRIANGLES, currentScene->skyCube->data.indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
 	glDepthMask(GL_TRUE);
 
-	glUniform1i(uKdSampler, 0);
-	glUniform1i(uKaSampler, 1);
-	glUniform1i(uKspecSampler, 2);
-	glUniform1i(uKshinSampler, 3);
-	glUniform1i(uNormalSampler, 4);
+	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKdSampler, 0); // Set the uniform to 0 because we use texture unit 0
+	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKaSampler, 1);
+	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKspecSampler, 2);
+	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKshinSampler, 3);
+	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uNormalSampler, 4);
 
 	glBindSampler(0, samplerObject);
 	glBindSampler(1, samplerObject);
@@ -381,9 +383,9 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 			glm::mat4 MVPMatrix = VPMatrix * o.modelMatrix;
 			glm::mat4 normalMat = glm::transpose(glm::inverse(MVMatrix));
 
-			glUniformMatrix4fv(uModelViewMatrix, 1, GL_FALSE, &MVMatrix[0][0]);
-			glUniformMatrix4fv(uModelViewProjMatrix,1, GL_FALSE, &MVPMatrix[0][0]);
-			glUniformMatrix4fv(uNormalMatrix,1, GL_FALSE, &normalMat[0][0]);
+			glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewMatrix,     1, GL_FALSE, glm::value_ptr(MVMatrix));
+			glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewProjMatrix, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+			glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uNormalMatrix,        1, GL_FALSE, glm::value_ptr(normalMat));
 
 			glBindVertexArray(o.VAO);
 			int indexCount, indexOffset = 0;
@@ -396,48 +398,48 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 					{
 						glActiveTexture(GL_TEXTURE0);
 						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KdTextureId]);
-						glProgramUniform1i(geometryProgram.glId(),uUseDTexture, 1);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseDTexture, 1);
 					}
 					else
 					{
-						glProgramUniform1i(geometryProgram.glId(),uUseDTexture, 0);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseDTexture, 0);
 					}
 					if (mat.KaTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE1);
 						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KaTextureId]);
-						glProgramUniform1i(geometryProgram.glId(),uUseATexture, 1);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseATexture, 1);
 					}
 					else
 					{
-						glProgramUniform1i(geometryProgram.glId(),uUseATexture, 0);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseATexture, 0);
 					}
 					if (mat.KsTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE2);
 						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KsTextureId]);
-						glProgramUniform1i(geometryProgram.glId(),uUseSpecTexture, 1);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseSpecTexture, 1);
 					}
 					else
 					{
-						glProgramUniform1i(geometryProgram.glId(),uUseSpecTexture, 0);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseSpecTexture, 0);
 					}
 					if (mat.shininessTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE3);
 						glBindTexture(GL_TEXTURE_2D, o.textures[mat.shininessTextureId]);
-						glProgramUniform1i(geometryProgram.glId(),uUseShinTexture, 1);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseShinTexture, 1);
 					}
 					else
 					{
-						glProgramUniform1i(geometryProgram.glId(),uUseShinTexture, 0);
+						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseShinTexture, 0);
 					}
 
 					indexCount = o.data.indexCountPerShape[i];
-					glProgramUniform3f(geometryProgram.glId(),uKd, mat.Kd.r,mat.Kd.g,mat.Kd.b);
-					glProgramUniform3f(geometryProgram.glId(),uKs, mat.Ks.r,mat.Ks.g,mat.Ks.b);
-					glProgramUniform3f(geometryProgram.glId(),uKa, mat.Ka.r,mat.Ka.g,mat.Ka.b);
-					glProgramUniform1f(geometryProgram.glId(),uShininess, mat.shininess);
+					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKd, mat.Kd.r,mat.Kd.g,mat.Kd.b);
+					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKs, mat.Ks.r,mat.Ks.g,mat.Ks.b);
+					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKa, mat.Ka.r,mat.Ka.g,mat.Ka.b);
+					glProgramUniform1f(geometryProgram.glId(), geometryProgram.uShininess, mat.shininess);
 					glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*) (indexOffset * sizeof(GLuint)));
 					indexOffset += indexCount;
 				}
@@ -445,7 +447,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 			else
 			{
 				glm::vec3 Kd(0.8f,0.8f,0.8f);
-				glProgramUniform3f(geometryProgram.glId(),uKd, Kd.r,Kd.g,Kd.b);
+				glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKd, Kd.r, Kd.g, Kd.b);
 				glDrawElements(GL_TRIANGLES, o.data.indexBuffer.size(), GL_UNSIGNED_INT, 0);
 			}
 			glBindVertexArray(0);
@@ -467,10 +469,10 @@ void Application::shadowRender(DirectionnalLight *shadowPtr)
 			DirectionnalLightShadowMap& shadow = *currentScene->dirLightData[i].shadowMap.get();
 			if (shadow.isDirty)
 			{
-				shadowProgram.use();
+				shadowProgram.glProgram.use();
 				currentScene->dirLightData[i].computeMatrix(currentScene->sceneCenter, currentScene->sceneDiag);
-				glUniformMatrix4fv(uDirLightViewProjMatrixShadow, 1,
-								   GL_FALSE, &currentScene->dirLightData[i].data.lightMatrix);
+				glUniformMatrix4fv(shadowProgram.uDirLightViewProjMatrixShadow, 1,
+								   GL_FALSE, glm::value_ptr(currentScene->dirLightData[i].data.lightMatrix));
 				solidRenderTo(shadow.FBO, 0, 0, DirectionnalLightShadowMap::resolution, DirectionnalLightShadowMap::resolution);
 				currentScene->dirLightData[i].data.lightMatrix = currentScene->dirLightData[i].data.lightMatrix *
 						camera.getRcpViewMatrix();
@@ -505,22 +507,22 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 	{
 		glActiveTexture(GL_TEXTURE30);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, currentScene->skyboxTexture);
-		glProgramUniform1i(shadingProgram.glId(), uSkyboxSampler, 30);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uSkyboxSampler, 30);
 
-		glProgramUniform3fv(shadingProgram.glId(), uAmbiantLight, 1, currentScene->ambiantLight);
+		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uAmbiantLightIntensity, 1, glm::value_ptr(currentScene->ambiantLight));
 
-		glProgramUniform1f(shadingProgram.glId(), uShadowMapBias, shadowMapBias);
+		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uShadowMapBias, shadowMapBias);
 
-		glProgramUniform1i(shadingProgram.glId(), uGDiffuse, 0); // Set the uniform to 0 because we use texture unit 0
-		glProgramUniform1i(shadingProgram.glId(), uGAmbient, 1);
-		glProgramUniform1i(shadingProgram.glId(), uGlossyShininess, 2);
-		glProgramUniform1i(shadingProgram.glId(), uGPosition, 3);
-		glProgramUniform1i(shadingProgram.glId(), uGNormal, 4);
-		glProgramUniform1i(depthProgram.glId(), uGDepth, 5);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGDiffuse,        0); // Set the uniform to 0 because we use texture unit 0
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGAmbient,        1);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGlossyShininess, 2);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGPosition,       3);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGNormal,         4);
+		glProgramUniform1i(depthProgram.glId(), shadingProgram.uGDepth, 5);
 
-		glProgramUniform3fv(shadingProgram.glId(), uFogColor, 1, currentScene->fogColor);
-		glProgramUniform1f(shadingProgram.glId(), uFogDistance, currentScene->fogDistance);
-		glProgramUniform1f(shadingProgram.glId(), uFogDensity, currentScene->fogDensity);
+		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uFogColor, 1, glm::value_ptr(currentScene->fogColor));
+		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uFogDistance, currentScene->fogDistance);
+		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uFogDensity, currentScene->fogDensity);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDiffuse]);
@@ -542,7 +544,7 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 		glBindSampler(4, bufferSamplerObject);
 		glBindSampler(5, bufferSamplerObject);
 
-		shadingProgram.use();
+		shadingProgram.glProgram.use();
 
 		glBindVertexArray(shadingVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -563,7 +565,11 @@ Application::Application(int argc, char** argv):
 	m_AssetsRootPath { m_AppPath.parent_path() / "assets" },
 	models(5),
 	scenes(3),
-	currentScene(nullptr)
+	currentScene(nullptr),
+	geometryProgram(m_ShadersRootPath / m_AppName),
+	shadingProgram(m_ShadersRootPath / m_AppName),
+	shadowProgram(m_ShadersRootPath / m_AppName),
+	depthProgram(m_ShadersRootPath / m_AppName)
 {
 	glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
 	ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file

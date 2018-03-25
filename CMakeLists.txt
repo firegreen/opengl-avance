@@ -8,6 +8,11 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 		)
 endif()
 
+if(WIN32)
+	add_definitions(-DNOMINMAX)
+	
+endif()
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(GLMLV_USE_BOOST_FILESYSTEM "Use boost for filesystem library instead of experimental std lib" OFF)
@@ -105,12 +110,22 @@ set(
 	third-party/${GLAD_DIR}/src/glad.c
 	)
 
-set(
-	LIBRARIES
-	${OPENGL_LIBRARIES}
-	glfw
-	glmlv
+if(WIN32)
+	set(
+		LIBRARIES
+		${OPENGL_LIBRARIES}
+		glfw
+		glmlv
+		Winmm
 	)
+else()
+	set(
+		LIBRARIES
+		${OPENGL_LIBRARIES}
+		glfw
+		glmlv
+	)
+endif()
 
 if (GLMLV_USE_BOOST_FILESYSTEM)
 	include_directories (${Boost_INCLUDE_DIRS})

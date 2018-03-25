@@ -3,6 +3,7 @@
 #include "utils.hpp"
 #include "Light.hpp"
 #include "Camera.hpp"
+#include "shaderPrograms.hpp"
 
 #include <glmlv/filesystem.hpp>
 #include <glmlv/GLFWHandle.hpp>
@@ -50,6 +51,9 @@ public:
 	const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { GL_RGB32F, GL_RGB32F, GL_RGB32F,
 																 GL_RGB32F, GL_RGBA32F, GL_DEPTH24_STENCIL8 };
 
+	const static size_t windowWidth;
+	const static size_t windowHeight;
+
 private:
     void loadImage(std::string filename, GLuint &textureID);
 	void loadSkybox(std::string foldername, std::string ext, GLuint &textureID);
@@ -69,9 +73,8 @@ private:
 	void shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
 	void shadingRender();
 
-	const static size_t windowWidth;
-	const static size_t windowHeight;
 	glmlv::GLFWHandle m_GLFWHandle{ windowWidth, windowHeight, "Ferme Ta GL" };
+
 
     const glmlv::fs::path m_AppPath;
     const std::string m_AppName;
@@ -86,11 +89,10 @@ private:
 
 	Camera camera;
 
-    glmlv::GLProgram geometryProgram;
-    glmlv::GLProgram shadingProgram;
-    glmlv::GLProgram shadowProgram;
-	glmlv::GLProgram depthProgram;
-	glmlv::GLProgram skyboxProgram;
+    GeometryProgramHandler geometryProgram;
+	ShadingProgramHandler shadingProgram;
+    ShadowProgramHandler shadowProgram;
+	DepthProgramHandler depthProgram;
 
     GLuint FBO = 0;
 	GLuint shadingVBO = 0;

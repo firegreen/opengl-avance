@@ -23,7 +23,7 @@ public:
 
 	const glm::mat4& getViewMatrix();
 	const glm::mat4& getProjectionMatrix(bool update = false);
-	glm::mat4 getVPMatrix() const;
+	glm::mat4 getVPMatrix();
 	glm::mat4 getRcpViewMatrix() const;
 
 private:

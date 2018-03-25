@@ -57,6 +57,11 @@ inline void DirectionnalLightShadowMap::initialiaze()
 
 void DirectionnalLightShadowMap::setUniforms(glmlv::GLProgram &shadingProgram, GLuint uShadowLightTexture)
 {
+
+	int texturesunits[DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT];
+	for (int i = 0; i < DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT; ++i)
+		texturesunits[i] = DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i;
+
 	glProgramUniform1iv(shadingProgram.glId(), uShadowLightTexture, DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT, texturesunits);
 	for (int i = 0; i < DirectionnalLightShadowMap::textureCount; ++i)
 	{

@@ -40,8 +40,6 @@ public:
 	void translate(float dx, float dy, float dz);
 	void rotate(float rotationX, float rotationY, float rotationZ);
 
-	virtual void draw() const;
-
 	const GLuint VBO = 0;
 	const GLuint VAO = 0;
 	const GLuint IBO = 0;

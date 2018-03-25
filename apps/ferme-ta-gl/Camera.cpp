@@ -3,7 +3,10 @@
 #include "Application.hpp"
 
 Camera::Camera()
-	: frontVector(0,0,-1), upVector(0,1,0), leftVector(1,0,0), position(0,0,0)
+	: frontVector(0,0,-1,0)
+	, upVector(0,1,0,0)
+	, leftVector(1,0,0,0)
+	, position(0,0,0,1)
 	{}
 
 void Camera::reset()
@@ -15,9 +18,9 @@ void Camera::reset()
 void Camera::update(float elapsedTime)
 {
 	modelMatrix = glm::translate(modelMatrix, translationSpeed*elapsedTime);
-	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.x*elapsedTime, vec3(1,0,0));
-	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.y*elapsedTime, vec3(0,1,0));
-	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.z*elapsedTime, vec3(0,0,1));
+	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.x*elapsedTime, glm::vec3(1,0,0));
+	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.y*elapsedTime, glm::vec3(0,1,0));
+	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.z*elapsedTime, glm::vec3(0,0,1));
 }
 
 const glm::mat4& Camera::getViewMatrix()
@@ -44,7 +47,7 @@ const glm::mat4& Camera::getProjectionMatrix(bool update)
 	return projM;
 }
 
-glm::mat4 Camera::getVPMatrix() const
+glm::mat4 Camera::getVPMatrix()
 {
 	getViewMatrix();
 	getProjectionMatrix();

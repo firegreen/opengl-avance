@@ -101,7 +101,7 @@ ObjectModel::~ObjectModel()
 
 Object3D *ObjectModel::instance()
 {
-	return new Object3D(VBO, VAO, IBO, data);
+	return new Object3D(VBO, VAO, IBO, data, textures);
 }
 
 Object3D::Object3D(GLuint VBO, GLuint VAO, GLuint IBO, const glmlv::ObjData &data, const std::vector<GLuint>& textures)
