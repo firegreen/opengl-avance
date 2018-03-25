@@ -1,5 +1,7 @@
 #include "shaderPrograms.hpp"
 
+#include "utils.hpp"
+
 GeometryProgramHandler::GeometryProgramHandler(glmlv::fs::path path)
 	: glProgram(glmlv::compileProgram({ path / "geometryPass.vs.glsl", path / "geometryPass.fs.glsl" }))
 
@@ -23,6 +25,7 @@ GeometryProgramHandler::GeometryProgramHandler(glmlv::fs::path path)
 	, uKshinSampler(glProgram.getUniformLocation("uKshinSampler"))
 	, uNormalSampler(glProgram.getUniformLocation("uNormalSampler"))
 {
+	checkGlError();
 }
 
 ShadingProgramHandler::ShadingProgramHandler(glmlv::fs::path path)
@@ -52,6 +55,8 @@ ShadingProgramHandler::ShadingProgramHandler(glmlv::fs::path path)
 
 	bPointLightData = glGetProgramResourceIndex(glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
 	glShaderStorageBlockBinding(glId(), bPointLightData, pointlightBindingIndex);
+
+	checkGlError();
 }
 
 ShadowProgramHandler::ShadowProgramHandler(glmlv::fs::path path)
@@ -59,6 +64,7 @@ ShadowProgramHandler::ShadowProgramHandler(glmlv::fs::path path)
 
 	, uDirLightViewProjMatrixShadow(glProgram.getUniformLocation("uDirLightViewProjMatrixShadow"))
 {
+	checkGlError();
 }
 
 DepthProgramHandler::DepthProgramHandler(glmlv::fs::path path)
@@ -66,4 +72,5 @@ DepthProgramHandler::DepthProgramHandler(glmlv::fs::path path)
 
 	, uGDepth(glProgram.getUniformLocation("uGDepth"))
 {
+	checkGlError();
 }

@@ -38,12 +38,18 @@ int Application::run()
 			camera.zNear = currentScene->sceneDiag * 0.001;
 			camera.zFar = currentScene->sceneDiag;
 			camera.getProjectionMatrix(true);
+
+			resetLights();
 		}
+
+		checkGlError();
 
 		lightStorageSize = sizeof(DirectionnalLight)*currentScene->dirLightData.size();
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 		DirectionnalLight* shadowPtr = (DirectionnalLight*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 																			 lightStorageSize, GL_MAP_WRITE_BIT);
+
+		checkGlError();
 
 		double start = glfwGetTime();
 		glQueryCounter(queryID[0], GL_TIMESTAMP);
@@ -249,13 +255,16 @@ void Application::initialiseBuffer()
 	}
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+	checkGlError();
 }
 
 void Application::initialiseScreen()
 {
 	glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
+	glGenVertexArrays(1, &shadingVAO);
 	glGenBuffers(1, &shadingVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, shadingVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, shadingVBO);
 	glBufferStorage(GL_ARRAY_BUFFER, 3*sizeof(glm::vec2), quadCoord, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -266,6 +275,8 @@ void Application::initialiseScreen()
 	glVertexAttribPointer(positionAttrLocation, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (const GLvoid*) 0);
 
 	glBindVertexArray(0);
+
+	checkGlError();
 }
 
 void Application::initialiseLights()
@@ -273,6 +284,7 @@ void Application::initialiseLights()
 	glGenBuffers(1, &dirLightSSBO);
 	glGenBuffers(1, &pointLightSSBO);
 	glGenBuffers(1, &shadowTexturesSSBO);
+
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingId, dirLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -284,6 +296,8 @@ void Application::initialiseLights()
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingId, shadowTexturesSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+	checkGlError();
 }
 
 void Application::initialiseSamplerObjects()
@@ -303,17 +317,24 @@ void Application::initialiseSamplerObjects()
 
 void Application::resetLights(int lightsCount)
 {
-	/*glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*dirLightData.size(), dirLightData.data(),
-					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	if (currentScene)
+	{
+		currentScene->resetLights(5);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*currentScene->dirLightData.size(), currentScene->dirLightData.data(),
+			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
 
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
-	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*pointLightData.size(), pointLightData.data(),
-					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*currentScene->pointLightData.size(), currentScene->pointLightData.data(),
+			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
 
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
-	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*shadowTextureData.size(), shadowTextureData.data(),
-					GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);*/
+		int* textureIDs = new int[currentScene->dirLightData.size()];
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(int)*currentScene->dirLightData.size(), textureIDs,
+			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	}
+
 }
 
 void Application::solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height)
@@ -370,6 +391,8 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 	glBindSampler(2, samplerObject);
 	glBindSampler(3, samplerObject);
 	glBindSampler(4, samplerObject);
+
+	checkGlError();
 
 	glm::mat4 VPMatrix = camera.getVPMatrix();
 
@@ -451,6 +474,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 				glDrawElements(GL_TRIANGLES, o.data.indexBuffer.size(), GL_UNSIGNED_INT, 0);
 			}
 			glBindVertexArray(0);
+			checkGlError();
 		}
 	}
 }
@@ -579,6 +603,7 @@ Application::Application(int argc, char** argv):
 	initialiseBuffer();
 	initialiseScreen();
 	initialiseLights();
+	initialiseSamplerObjects();
 
 	checkGlError();
 }

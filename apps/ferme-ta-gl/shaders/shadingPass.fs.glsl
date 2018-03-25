@@ -58,23 +58,14 @@ struct PointLight
 
 struct DirectionnalLight
 {
+	mat4 lightMatrix;
     vec4 color;
     vec4 direction;
 };
 
-struct DirectionnalLightShadow
-{
-    mat4 lightViewProjMatrix;
-    int shadowMapLayer;
-    float shadowMapBias;
-};
-
-uniform sampler2DShadow uDirLightShadowMap;
-
-
 layout (std430, binding=3) buffer bShadowData
 {
-	mat4 shadowLightViewProjMatrix[];
+	int shadowMapID[];
 };
 
 layout (std430, binding=2) buffer bPointLightData
@@ -141,7 +132,7 @@ void main()
 		{
 			if (uCastShadow)
 			{
-				vec4 positionInDirLightScreen = shadowLightViewProjMatrix[i] * vec4(position, 1);
+				vec4 positionInDirLightScreen = dirLights[i].lightMatrix * vec4(position, 1);
 				vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
 				float dirLightVisibility = textureProj(uShadowLightMap[i],
 														vec4(positionInDirLightNDC.xy,
@@ -172,7 +163,7 @@ void main()
 			{
 				color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess);
 			}
-			//color = vec3(100, 0,0) * shadowLightViewProjMatrix[i][int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
+			//color = vec3(100, 0,0) * dirLights[i].lightMatrix[int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
 
 			//if (gl_FragCoord.x < 700 && gl_FragCoord.y < 700)
 				//color += vec3(texelFetch(uShadowLightMap[i], ivec2(gl_FragCoord.xy), 0));

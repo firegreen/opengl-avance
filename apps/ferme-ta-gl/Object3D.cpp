@@ -40,6 +40,7 @@ ObjectModel::ObjectModel(const glmlv::fs::path &objPath, bool loadTextures)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
+	checkGlError();
 
 	textures.resize(data.textures.size(),0);
 	for (int i=0; i<data.textures.size(); ++i)
@@ -56,12 +57,15 @@ ObjectModel::ObjectModel(const std::vector<glmlv::Vertex3f3f2f> &vertex, const s
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferStorage(GL_ARRAY_BUFFER, vertex.size()*sizeof(glmlv::Vertex3f3f2f), vertex.data(), 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	checkGlError();
 
 	// IBO Init (indice Buffer)
 	glGenBuffers(1, &IBO);
 	glBindBuffer(GL_ARRAY_BUFFER, IBO);
 	glBufferStorage(GL_ARRAY_BUFFER, sizeof(uint32_t)*indices.size(), indices.data(), 0);
+	checkGlError();
 
+	glGenVertexArrays(1, &VAO);
 
 	glBindVertexArray(VAO);
 
@@ -70,20 +74,19 @@ ObjectModel::ObjectModel(const std::vector<glmlv::Vertex3f3f2f> &vertex, const s
 	glEnableVertexAttribArray(positionAttrLocation);
 	glVertexAttribPointer(positionAttrLocation, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f),
 						  (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, position));
-
+	checkGlError();
 	glEnableVertexAttribArray(normalAttrLocation);
 	glVertexAttribPointer(normalAttrLocation, 3, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f),
 						  (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, normal));
-
+	checkGlError();
 	glEnableVertexAttribArray(texCoordsAttrLocation);
 	glVertexAttribPointer(texCoordsAttrLocation, 2, GL_FLOAT, GL_FALSE, sizeof(glmlv::Vertex3f3f2f),
 						  (const GLvoid*) offsetof(glmlv::Vertex3f3f2f, texCoords));
-
+	checkGlError();
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
 	glBindVertexArray(0);
+	checkGlError();
 }
 
 ObjectModel::~ObjectModel()
@@ -97,6 +100,7 @@ ObjectModel::~ObjectModel()
 	if (VAO) {
 		glDeleteBuffers(1, &VAO);
 	}
+	checkGlError();
 }
 
 Object3D *ObjectModel::instance()

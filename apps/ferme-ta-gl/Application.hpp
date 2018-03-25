@@ -32,8 +32,7 @@ public:
 	{
 		dirlightBindingId = 1,
 		pointlightBindingId = 2,
-		shadowBindingId = 3,
-		shadowTexturesBindingId = 4
+		shadowBindingId = 3
 	};
 
 	enum InputLocation
