@@ -8,7 +8,7 @@ GLuint* DirectionnalLightShadowMap::textures = nullptr;
 GLuint DirectionnalLightShadowMap::textureCount = 0;
 GLuint DirectionnalLightShadowMap::sampler = 0;
 
-inline void DirectionnalLightShadowMap::initialiaze(glmlv::GLProgram & shadingProgram, GLuint uShadowLightTexture)
+inline void DirectionnalLightShadowMap::initialiaze()
 {
 	if (!textures)
 	{
@@ -20,13 +20,6 @@ inline void DirectionnalLightShadowMap::initialiaze(glmlv::GLProgram & shadingPr
 		GLint texturesunits[DIR_MAX_SHADOW_COUNT];
 		for (int i = 0; i < DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT; ++i)
 			texturesunits[i] = DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i;
-		glProgramUniform1iv(shadingProgram.glId(), uShadowLightTexture, DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT, texturesunits);
-		for (int i = 0; i < DirectionnalLightShadowMap::textureCount; ++i)
-		{
-			glActiveTexture(GL_TEXTURE0 + DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i);
-			glBindTexture(GL_TEXTURE_2D, DirectionnalLightShadowMap::textures[i]);
-			glBindSampler(DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i, DirectionnalLightShadowMap::sampler);
-		}
 		checkGlError();
 		textureCount = 0;
 	}
@@ -43,13 +36,13 @@ inline void DirectionnalLightShadowMap::initialiaze(glmlv::GLProgram & shadingPr
 		checkGlError();
 	}
 
-	layer = textureCount;
+	layerID = textureCount;
 	++textureCount;
 
 	glGenFramebuffers(1, &FBO);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
 
-	glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textures[layer], 0);
+	glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textures[layerID], 0);
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	checkGlError();
@@ -61,6 +54,37 @@ inline void DirectionnalLightShadowMap::initialiaze(glmlv::GLProgram & shadingPr
 	}
 }
 
+
+void DirectionnalLightShadowMap::setUniforms(glmlv::GLProgram &shadingProgram, GLuint uShadowLightTexture)
+{
+	glProgramUniform1iv(shadingProgram.glId(), uShadowLightTexture, DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT, texturesunits);
+	for (int i = 0; i < DirectionnalLightShadowMap::textureCount; ++i)
+	{
+		glActiveTexture(GL_TEXTURE0 + DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i);
+		glBindTexture(GL_TEXTURE_2D, DirectionnalLightShadowMap::textures[i]);
+		glBindSampler(DirectionnalLightShadowMap::DIR_SHADOW_TEXTURE_UNIT_OFFSET + i, DirectionnalLightShadowMap::sampler);
+	}
+}
+
+void DirectionnalLightShadowMap::freeMaps()
+{
+	textureCount = 0;
+}
+
+
+void DirectionnalLight::castShadow(bool cast)
+{
+	if (cast)
+	{
+		shadowMap.reset(new DirectionnalLightShadowMap());
+		shadowMap->initialiaze();
+	}
+	else
+	{
+		shadowMap.release();
+	}
+}
+
 void DirectionnalLight::computeMatrix(glm::vec3 sceneCenter, float sceneDiag)
 {
 	const glm::vec3 lightDir = glm::vec3(data.direction);
@@ -68,39 +92,4 @@ void DirectionnalLight::computeMatrix(glm::vec3 sceneCenter, float sceneDiag)
 	const auto dirLightViewMatrix = glm::lookAt(sceneCenter - lightDir * sceneDiag * 0.5f, sceneCenter, dirLightUpVector);
 	auto lightProj = glm::ortho(-sceneDiag, sceneDiag, -sceneDiag, sceneDiag, 0.01f * sceneDiag, sceneDiag);
 	data.lightMatrix = lightProj * dirLightViewMatrix;
-}
-
-void DirectionnalLight::update(glm::vec3 sceneCenter, float sceneDiag)
-{
-	if (isDirty)
-	{
-		Application::shadowProgram.use();
-
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
-		glViewport(0, 0, resolution, resolution);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		glUniformMatrix4fv(data.lightMatrix, 1, GL_FALSE, &shadow.lightMatrix[0][0]);
-
-		glBindVertexArray(sceneVAO);
-
-		// We draw each shape by specifying how much indices it carries, and with an offset in the global index buffer
-		int indexCount, indexOffset = 0;
-		for (int i = 0; i<loadedScene.shapeCount; i++)
-		{
-			indexCount = loadedScene.indexCountPerShape[i];
-			glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*)(indexOffset * sizeof(GLuint)));
-			indexOffset += indexCount;
-		}
-
-		glBindVertexArray(0);
-
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-		shadow.lightMatrix = shadow.lightMatrix * camera.getRcpViewMatrix();
-
-		memcpy(shadowPtr + i, (void*)&shadow.lightMatrix[0][0], sizeof(glm::mat4));
-
-		shadow.isDirty = false;
-	}
 }

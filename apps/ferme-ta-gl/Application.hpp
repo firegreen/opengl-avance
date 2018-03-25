@@ -2,6 +2,7 @@
 
 #include "utils.hpp"
 #include "Light.hpp"
+#include "Camera.hpp"
 
 #include <glmlv/filesystem.hpp>
 #include <glmlv/GLFWHandle.hpp>
@@ -10,7 +11,7 @@
 #include <glmlv/ViewController.hpp>
 #include <glmlv/load_obj.hpp>
 #include <glmlv/Image2DRGBA.hpp>
-
+#include "Scene.hpp"
 
 class Application
 {
@@ -26,6 +27,21 @@ public:
         GBufferTextureCount
     };
 
+	enum BindingId
+	{
+		dirlightBindingId = 1,
+		pointlightBindingId = 2,
+		shadowBindingId = 3,
+		shadowTexturesBindingId = 4
+	};
+
+	enum InputLocation
+	{
+		positionAttrLocation = 0,
+		normalAttrLocation = 1,
+		texCoordsAttrLocation = 2
+	};
+
     Application(int argc, char** argv);
     ~Application();
 
@@ -37,10 +53,25 @@ public:
 private:
     void loadImage(std::string filename, GLuint &textureID);
 	void loadSkybox(std::string foldername, std::string ext, GLuint &textureID);
+	void initialiseLights();
+	void initialiseBuffer();
+	void initialiseScreen();
+	void initialiseSamplerObjects();
 
-	const size_t m_nWindowWidth = 1200;
-	const size_t m_nWindowHeight = 700;
-    glmlv::GLFWHandle m_GLFWHandle{ m_nWindowWidth, m_nWindowHeight, "Template" }; // Note: the handle must be declared before the creation of any object managing OpenGL resource (e.g. GLProgram, GLShader)
+	void resetLights(int lightsCount = 3);
+
+	void solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
+	void solidRender();
+	void materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
+	void materialRender();
+	void shadowRender(DirectionnalLight* shadowPtr);
+	void shadowViewUpdate(DirectionnalLight* shadowPtr);
+	void shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
+	void shadingRender();
+
+	const static size_t windowWidth;
+	const static size_t windowHeight;
+	glmlv::GLFWHandle m_GLFWHandle{ windowWidth, windowHeight, "Ferme Ta GL" };
 
     const glmlv::fs::path m_AppPath;
     const std::string m_AppName;
@@ -48,7 +79,12 @@ private:
     const glmlv::fs::path m_ShadersRootPath;
     const glmlv::fs::path m_AssetsRootPath;
 
-    glmlv::ViewController camera;
+	GLuint samplerObject;
+	GLuint bufferSamplerObject;
+
+	bool displayGUI = false;
+
+	Camera camera;
 
     glmlv::GLProgram geometryProgram;
     glmlv::GLProgram shadingProgram;
@@ -56,104 +92,19 @@ private:
 	glmlv::GLProgram depthProgram;
 	glmlv::GLProgram skyboxProgram;
 
-
-    GLuint cubeVBO = 0;
-    GLuint cubeVAO = 0;
-    GLuint cubeIBO = 0;
-
-    GLuint sphereVBO = 0;
-    GLuint sphereVAO = 0;
-    GLuint sphereIBO = 0;
-
-    GLuint sceneVBO = 0;
-    GLuint sceneVAO = 0;
-    GLuint sceneIBO = 0;
-
-    GLuint quadVBO = 0;
-    GLuint quadVAO = 0;
-
-	GLuint skyboxVBO = 0;
-	GLuint skyboxVAO = 0;
-	GLuint skyboxIBO = 0;
-
     GLuint FBO = 0;
+	GLuint shadingVBO = 0;
+	GLuint shadingVAO = 0;
 
-    std::vector<DirectionnalLight> dirLightData;
-    std::vector<DirectionnalLightShadowMap> dirLightShadows;
-    std::vector<PointLight> pointLightData;
     GLuint dirLightSSBO = 0;
     GLuint pointLightSSBO = 0;
-	GLuint shadowSSBO = 0;
 	GLuint shadowTexturesSSBO = 0;
 
-    GLuint uModelViewProjMatrix = 0;
-    GLuint uModelViewMatrix = 0;
-    GLuint uNormalMatrix = 0;
-
-	GLuint uSkyProjMatrix = 0;
-	GLuint uSkyMatrix = 0;
-
-    GLuint metalTexture = 0;
-    GLuint woodTexture = 0;
-	GLuint skyboxTexture = 0;
-    std::vector<GLuint> sceneTextures;
-
-    GLuint uDirectionalLightDir;
-    GLuint uDirectionalLightIntensity;
-
-    GLuint uPointLightPosition;
-    GLuint uPointLightIntensity;
-
-    GLuint uAmbiantLightIntensity;
-
-    GLuint uKd;
-    GLuint uKs;
-    GLuint uKa;
-    GLuint uShininess;
-
-    GLuint uUseDTexture;
-    GLuint uUseATexture;
-    GLuint uUseSpecTexture;
-    GLuint uUseShinTexture;
-    GLuint uKdSampler;
-    GLuint uKaSampler;
-    GLuint uKspecSampler;
-    GLuint uKshinSampler;
-    GLuint uNormalSampler;
-	GLuint samplerObject;
-
-	GLuint uSkyboxSampler;
-
-    GLuint uGPosition;
-    GLuint uGNormal;
-    GLuint uGAmbient;
-    GLuint uGDiffuse;
-    GLuint uGlossyShininess;
-	GLuint uGDepth;
-	GLuint uGShadingDepth;
-	GLuint samplerBuffer;
-
-    GLuint uCastShadow;
-
-    GLuint uDirLightShadowMap;
-
-    GLuint uDirLightViewProjMatrixShadow;
-	GLuint uShadowMapBias;
-
-	GLuint uShadowLightMap;
-
-	GLuint uFogColor;
-	GLuint uFogDistance;
-	GLuint uFogDensity;
-
-    GLuint bDirLightData;
-    GLuint bPointLightData;
-
-    glmlv::SimpleGeometry cube;
-	glmlv::SimpleGeometry skyCube;
-    glmlv::SimpleGeometry sphere;
-    glmlv::ObjData loadedScene;
-
     GLuint gBufferTextures[GBufferTextureCount];
-    bool displayBuffer[GBufferTextureCount];
+
+	std::vector<ObjectModel*> models;
+	std::vector<Scene> scenes;
+	Scene* currentScene;
+
+	float shadowMapBias = 0.01;
 };

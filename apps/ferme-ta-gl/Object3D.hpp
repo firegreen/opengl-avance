@@ -8,15 +8,24 @@
 
 class Object3D;
 
-class ObjectLoader
-{
+class ObjectModel
+{	
+
+public:
+	ObjectModel(const glmlv::fs::path & objPath, bool loadTextures = true);
+	ObjectModel(const std::vector<glmlv::Vertex3f3f2f>& vertex, const std::vector<uint32_t> &indices);
+	~ObjectModel();
+	Object3D* instance();
+
+	static const GLint positionAttrLocation;
+	static const GLint normalAttrLocation;
+	static const GLint texCoordsAttrLocation;
+private:
 	GLuint VBO = 0;
 	GLuint VAO = 0;
 	GLuint IBO = 0;
-
-	std::shared_ptr<glmlv::ObjData> data;
-	ObjectLoader(const fs::path & objPath, const fs::path & mtlBaseDir, ObjData & data, bool loadTextures = true);
-	Object3D* instance();
+	glmlv::ObjData data;
+	std::vector<GLuint> textures;
 };
 
 
@@ -24,12 +33,7 @@ class Object3D
 {
 public:
 
-	GLuint VBO = 0;
-	GLuint VAO = 0;
-	GLuint IBO = 0;
-
-	std::shared_ptr<glmlv::ObjData> data;
-	glm::mat4 transformM;
+	Object3D(GLuint VBO, GLuint VAO, GLuint IBO, const glmlv::ObjData& data, const std::vector<GLuint>& textures);
 
 	void scale(float t);
 	void scale(float x, float y, float z);
@@ -37,4 +41,12 @@ public:
 	void rotate(float rotationX, float rotationY, float rotationZ);
 
 	virtual void draw() const;
+
+	const GLuint VBO = 0;
+	const GLuint VAO = 0;
+	const GLuint IBO = 0;
+
+	const glmlv::ObjData& data;
+	const std::vector<GLuint>& textures;
+	glm::mat4 modelMatrix;
 };
