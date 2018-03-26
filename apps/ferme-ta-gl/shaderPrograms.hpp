@@ -58,6 +58,8 @@ struct ShadingProgramHandler {
 	GLuint bDirLightData;
 	GLuint bPointLightData;
 	GLuint bShadowData;
+
+	GLuint uViewMatrix;
 };
 
 struct ShadowProgramHandler {
@@ -67,6 +69,7 @@ struct ShadowProgramHandler {
 	GLuint glId() const { return glProgram.glId(); }
 
 	GLuint uDirLightViewProjMatrixShadow;
+	GLuint uDirLightModelMatrixShadow;
 
 };
 

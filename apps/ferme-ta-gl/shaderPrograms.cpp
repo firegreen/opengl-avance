@@ -3,6 +3,7 @@
 
 #include "utils.hpp"
 #include "Application.hpp"
+#include "Light.hpp"
 
 GeometryProgramHandler::GeometryProgramHandler(glmlv::fs::path path)
 	: glProgram(glmlv::compileProgram({ path / "geometryPass.vs.glsl", path / "geometryPass.fs.glsl" }))
@@ -38,7 +39,6 @@ ShadingProgramHandler::ShadingProgramHandler(glmlv::fs::path path)
 	, uGAmbient(glProgram.getUniformLocation("uGAmbient"))
 	, uGDiffuse(glProgram.getUniformLocation("uGDiffuse"))
 	, uGlossyShininess(glProgram.getUniformLocation("uGlossyShininess"))
-	, uGDepth(glProgram.getUniformLocation("uGDepth"))
 	, uGShadingDepth(glProgram.getUniformLocation("uGShadingDepth"))
 
 	, uSkyboxSampler(glProgram.getUniformLocation("uSkyboxSampler"))
@@ -51,6 +51,7 @@ ShadingProgramHandler::ShadingProgramHandler(glmlv::fs::path path)
 	, uFogColor(glProgram.getUniformLocation("uFogColor"))
 	, uFogDensity(glProgram.getUniformLocation("uFogDensity"))
 	, uFogDistance(glProgram.getUniformLocation("uFogDistance"))
+	, uViewMatrix(glProgram.getUniformLocation("uViewMatrix"))
 {
 	checkGlError();
 }
@@ -59,6 +60,7 @@ ShadowProgramHandler::ShadowProgramHandler(glmlv::fs::path path)
 	: glProgram(glmlv::compileProgram({ path / "directionalSM.vs.glsl", path / "directionalSM.fs.glsl" }))
 
 	, uDirLightViewProjMatrixShadow(glProgram.getUniformLocation("uDirLightViewProjMatrixShadow"))
+	, uDirLightModelMatrixShadow(glProgram.getUniformLocation("uDirLightModelMatrixShadow"))
 {
 	checkGlError();
 }

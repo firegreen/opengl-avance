@@ -28,6 +28,17 @@ int Application::run()
 	int lightStorageSize = 0;
 	DirectionnalLight::Data* shadowPtr;
 
+	GLint texturesunits[DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT];
+	for (int i=0; i < DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT; ++i)
+		texturesunits[i] = 20 + i;
+	glProgramUniform1iv(shadingProgram.glId(), shadingProgram.uShadowLightMap, DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT, texturesunits);
+	for (int i=0; i < DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT; ++i)
+	{
+		glActiveTexture(GL_TEXTURE20 + i);
+		glBindTexture(GL_TEXTURE_2D, DirectionnalLightShadowMap::textures[i]);
+		glBindSampler(20 + i, DirectionnalLightShadowMap::sampler);
+	}
+
 	for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
 	{
 		const auto seconds = glfwGetTime();
@@ -38,7 +49,6 @@ int Application::run()
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 														lightStorageSize, GL_MAP_WRITE_BIT);
-
 		checkGlError();
 
 		double start = glfwGetTime();
@@ -62,6 +72,8 @@ int Application::run()
 		start = glfwGetTime();
 		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 		shadowPtr = nullptr;
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
 		shadingRender();
 		glQueryCounter(queryID[5], GL_TIMESTAMP);
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
@@ -73,12 +85,11 @@ int Application::run()
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
 		checkGlError();
 
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
-		glReadBuffer(GL_COLOR_ATTACHMENT1);
+		/*
+		glReadBuffer(GL_COLOR_ATTACHMENT2);
 		glBlitFramebuffer(0,0,windowWidth/2,windowHeight,
 						  0,0,windowWidth/2,windowHeight,
-						  GL_COLOR_BUFFER_BIT, GL_NEAREST);
+						  GL_COLOR_BUFFER_BIT, GL_NEAREST);*/
 
 		int width = windowWidth; int height = windowHeight;
 		//std::cout << "========= GUI =========" << std::endl;
@@ -132,6 +143,7 @@ int Application::run()
 
 		auto ellapsedTime = glfwGetTime() - seconds;
 		camera.update(float(ellapsedTime));
+		camera.getViewMatrix();
 		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 														lightStorageSize, GL_MAP_WRITE_BIT);
 		shadowViewUpdate(shadowPtr);
@@ -340,7 +352,7 @@ void Application::resetLights(int lightsCount)
 
 		checkGlError();
 
-		/*shadingProgram.bDirLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
+		shadingProgram.bDirLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
 		glShaderStorageBlockBinding(shadingProgram.glId(), shadingProgram.bDirLightData, Application::dirlightBindingId);
 
 		shadingProgram.bPointLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
@@ -348,7 +360,7 @@ void Application::resetLights(int lightsCount)
 
 		shadingProgram.bShadowData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bShadowData");
 		glShaderStorageBlockBinding(shadingProgram.glId(), shadingProgram.bShadowData, Application::shadowBindingId);
-*/
+
 		checkGlError();
 	}
 }
@@ -368,6 +380,8 @@ void Application::solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, si
 			const Object3D& o = *oPtr.get();
 			glBindVertexArray(o.VAO);
 			int indexCount, indexOffset = 0;
+			glUniformMatrix4fv(shadowProgram.uDirLightModelMatrixShadow, 1,
+							   GL_FALSE, glm::value_ptr(o.modelMatrix));
 			for (int i = 0; i < o.data->shapeCount; i++)
 			{
 				indexCount = o.data->indexCountPerShape[i];
@@ -395,11 +409,19 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 	checkGlError();
 
 	glm::mat4 VPMatrix = camera.getVPMatrix();
-	glm::mat4 MVMatrix = glm::scale(glm::mat4(), glm::vec3(100,100,100));
-	glm::mat4 MVPMatrix = VPMatrix;
+	//glm::mat4 MVMatrix =  glm::mat4();
+	//glm::mat4 MVPMatrix = VPMatrix * glm::scale(glm::mat4(), glm::vec3(5,5,5));
 	glm::mat4 normalMat =  glm::mat4();
 
-	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewMatrix,     1, GL_FALSE, glm::value_ptr(MVMatrix));
+	glm::mat4 MVMatrix(glm::mat4(glm::mat3(camera.getViewMatrix())) * glm::scale(glm::mat4(), glm::vec3(80,80,80)));
+	glm::mat4 MVPMatrix(glm::perspective(
+						glm::radians(camera.FoV),
+						windowWidth / (float)windowHeight,
+						1.f,
+						90.f
+					) * MVMatrix);
+
+	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewMatrix,     1, GL_FALSE, glm::value_ptr(normalMat));
 	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewProjMatrix, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
 	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uNormalMatrix,        1, GL_FALSE, glm::value_ptr(normalMat));
 
@@ -407,7 +429,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 
 	glDepthMask(GL_FALSE);
 	glBindVertexArray(currentScene->skyCube->VAO);
-	//glDrawElements(GL_TRIANGLES, currentScene->skyCube->data->indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
+	glDrawElements(GL_TRIANGLES, currentScene->skyCube->data->indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
 	glDepthMask(GL_TRUE);
 	checkGlError();
 
@@ -570,7 +592,6 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 
 		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uAmbiantLightIntensity, 1,
 							glm::value_ptr(currentScene->ambiantLight));
-
 		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uShadowMapBias, shadowMapBias);
 
 		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGDiffuse,        0); // Set the uniform to 0 because we use texture unit 0
@@ -578,11 +599,14 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGlossyShininess, 2);
 		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGPosition,       3);
 		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGNormal,         4);
-		glProgramUniform1i(depthProgram.glId(), shadingProgram.uGDepth, 5);
+		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uGShadingDepth, 5);
 
 		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uFogColor, 1, glm::value_ptr(currentScene->fogColor));
 		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uFogDistance, currentScene->fogDistance);
 		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uFogDensity, currentScene->fogDensity);
+
+		glProgramUniformMatrix4fv(shadingProgram.glId(),
+								  shadingProgram.uViewMatrix, 1, GL_FALSE, glm::value_ptr(camera.getViewMatrix()));
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDiffuse]);
@@ -645,8 +669,8 @@ Application::Application(int argc, char** argv):
 		currentScene->objects.push_back(ptr);
 		loadSkybox("skybox1","jpg",currentScene->skyboxTexture);
 		camera.FoV = 60;
-		camera.zNear = currentScene->sceneDiag * 0.001;
-		camera.zFar = currentScene->sceneDiag;
+		camera.zNear = currentScene->sceneDiag * 0.01;
+		camera.zFar = currentScene->sceneDiag * 2;
 		camera.getProjectionMatrix(true);
 
 		resetLights();

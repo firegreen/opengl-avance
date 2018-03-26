@@ -2,9 +2,10 @@
 
 
 layout(location = 0) in vec3 aPosition;
-uniform mat4 uDirLightViewProjMatrix;
+uniform mat4 uDirLightViewProjMatrixShadow;
+uniform mat4 uDirLightModelMatrixShadow;
 
 void main()
 {
-    gl_Position =  uDirLightViewProjMatrix * vec4(aPosition, 1);
+	gl_Position =  uDirLightViewProjMatrixShadow * uDirLightModelMatrixShadow * vec4(aPosition, 1);
 }

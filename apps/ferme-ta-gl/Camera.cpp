@@ -8,7 +8,7 @@ Camera::Camera()
 	, leftVector(1,0,0,0)
 	, position(0,0,0,1),
 	  translationSpeed(0.5,2,2),
-	  rotationSpeed(0,2,0)
+	  rotationSpeed(0,2,1)
 	{}
 
 void Camera::reset()
@@ -42,7 +42,7 @@ const glm::mat4& Camera::getProjectionMatrix(bool update)
 			glm::radians(FoV),
 			Application::windowWidth / (float) Application::windowHeight,
 			zNear,
-			zFar*10
+			zFar
 		);
 	}
 	return projM;

@@ -94,13 +94,7 @@ ObjectModel::ObjectModel(const std::vector<glmlv::Vertex3f3f2f> &vertex, const s
 
 ObjectModel::~ObjectModel()
 {
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	glBindVertexArray(0);
-
+/*
 	if (IBO) {
 		glDeleteBuffers(1, &IBO);
 	}
@@ -110,8 +104,8 @@ ObjectModel::~ObjectModel()
 	}
 	checkGlError();
 	if (VAO) {
-		glDeleteVertexArrays(1, &VAO);
-	}
+		glDeleteBuffers(1, &VAO);
+	}*/
 	checkGlError();
 }
 

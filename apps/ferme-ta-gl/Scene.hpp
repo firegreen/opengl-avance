@@ -22,13 +22,13 @@ struct Scene
 	glm::vec3 ambiantLight = glm::vec3(0.2f, 0.2f, 0.2f);
 
 	glm::vec3 fogColor = glm::vec3(1.f, 1.f, 1.f);
-	float fogDistance;
-	float fogDensity;
+	float fogDistance = 1.f;
+	float fogDensity = 0.0002f;
 
 
 
 	glm::vec3 sceneCenter;
-	float sceneDiag = 100;
+	float sceneDiag = 2000;
 
 	std::vector<std::shared_ptr<Object3D>> objects;
 

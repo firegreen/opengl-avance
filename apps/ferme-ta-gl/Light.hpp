@@ -47,16 +47,12 @@ struct DirectionnalLight
 		// data to send to the shader
 		glm::mat4 lightMatrix;
 		glm::vec4 color{ 0,0,0,0 };
-		glm::vec4 direction{ 1,0,0,1 };
+		glm::vec4 direction{ 1,0,0,0 };
 
 		Data() {}
 		Data(glm::vec4 color, glm::vec4 direction)
 			: color(color), direction(direction) {}
 
-		void updateLightMatrix()
-		{
-
-		}
 	} data;
 
 	bool isDirty = true;

@@ -62,7 +62,7 @@ private:
 	void initialiseSamplerObjects();
 	void initialiseModels();
 
-	void resetLights(int lightsCount = 3);
+	void resetLights(int lightsCount = 5);
 
 	void solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
 	void solidRender();

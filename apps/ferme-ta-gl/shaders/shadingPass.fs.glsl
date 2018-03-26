@@ -12,11 +12,6 @@ uniform sampler2D uGShadingDepth;
 
 uniform samplerCube uSkyboxSampler;
 
-uniform vec3 uDirectionalLightDir;
-uniform vec3 uDirectionalLightIntensity;
-
-uniform vec3 uPointLightPosition;
-uniform vec3 uPointLightIntensity;
 uniform vec3 uAmbiantLightIntensity;
 
 uniform float uShadowMapBias;
@@ -26,6 +21,8 @@ uniform bool uCastShadow;
 uniform vec3 uFogColor;
 uniform float uFogDistance;
 uniform float uFogDensity;
+
+uniform mat4 uViewMatrix;
 
 out vec3 fColor;
 
@@ -80,8 +77,8 @@ layout (std430, binding=1) buffer bDirLightData
 
 vec3 blingPhong(vec3 lightDir, vec3 eyeDir, vec3 N, vec3 diffuse, vec3 specular)
 {
-    float dotWN = max(0.0, dot(N, -uDirectionalLightDir));
-    float dotHalfVN = max(0.0, dot(N,(-uDirectionalLightDir+eyeDir)*0.5f));
+	float dotWN = max(0.0, dot(N, -lightDir));
+	float dotHalfVN = max(0.0, dot(N,(-lightDir+eyeDir)*0.5f));
     return (diffuse*dotWN+specular*dotHalfVN);
 }
 
@@ -99,15 +96,16 @@ vec3 directionalColor(vec3 lightColor, vec3 lightDir, vec3 N, vec3 diffuse, vec4
 
 vec3 pointColor(vec3 lightColor, vec3 lightPos, vec3 N, vec3 position, vec3 diffuse, vec4 shininess)
 {
-    float distToPointLight = length(lightPos - position);
-    vec3 dirToObject = (lightPos - position) / distToPointLight;
-	return (lightColor) /
+	vec3 lightViewSpace = vec3(uViewMatrix * vec4(lightPos,1));
+	float distToPointLight = length(lightViewSpace - position);
+	vec3 dirToObject = (lightViewSpace - position) / distToPointLight;
+	return lightColor * blingPhongShininess(dirToObject, vec3(0,0,1), N, diffuse, shininess.rgb, shininess.a) /
             (distToPointLight * distToPointLight);
 }
 
 vec3 ambiantColor(vec3 lightColor, vec3 uKa)
 {
-    return uAmbiantLightIntensity * uKa;
+	return lightColor * uKa;
 }
 
 void main()
@@ -129,13 +127,13 @@ void main()
 		color = ambiantColor(uAmbiantLightIntensity, ambient);
 		for (int i=0; i<dirLights.length();++i)
 		{
-			if (uCastShadow)
+			if (shadowMapID[i]>=0)
 			{
-				/*vec4 positionInDirLightScreen = dirLights[i].lightMatrix * vec4(position, 1);
+				vec4 positionInDirLightScreen = dirLights[i].lightMatrix * vec4(position, 1);
 				vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
-				float dirLightVisibility = textureProj(uShadowLightMap[i],
+				float dirLightVisibility = textureProj(uShadowLightMap[shadowMapID[i]],
 														vec4(positionInDirLightNDC.xy,
-															positionInDirLightNDC.z - uShadowMapBias, 1.0),
+															positionInDirLightNDC.z - 0.01, 1.0),
 														0);
 				if (dirLightVisibility > 0.0)
 				{
@@ -147,16 +145,16 @@ void main()
 										int(gl_FragCoord.y) % (i+1)+
 										position.z * i) % 16;
 
-						dirLightVisibility += textureProj(uShadowLightMap[i],
+						dirLightVisibility += textureProj(uShadowLightMap[shadowMapID[i]],
 														  vec4(positionInDirLightNDC.xy + 0.0002 * poissonDisk[index],
-															   positionInDirLightNDC.z - uShadowMapBias, 1.0),
+															   positionInDirLightNDC.z - 0.01, 1.0),
 														  0.0);
 					}
 					dirLightVisibility *= 0.25;
 					color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess)
 							* dirLightVisibility;
 				}
-				//color = dirLightVisibility * vec3(1,1,0);*/
+				//color = dirLightVisibility * vec3(1,1,0);
 			}
 			else
 			{
@@ -165,18 +163,20 @@ void main()
 			//color = vec3(100, 0,0) * dirLights[i].lightMatrix[int(4*gl_FragCoord.x / 1200)][int(4*(1-gl_FragCoord.y / 900))];
 
 			//if (gl_FragCoord.x < 700 && gl_FragCoord.y < 700)
-				//color += vec3(texelFetch(uShadowLightMap[i], ivec2(gl_FragCoord.xy), 0));
+				//color += vec3(texelFetch(uShadowLightMap[shadowMapID[i]], ivec2(gl_FragCoord.xy), 0));
 		}
 
 		for (int i=0; i<pointLights.length();++i)
+		{
 			color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
+		}
+
 		color = mix(
 			color,
 			uFogColor,
 			pow(depth, 1.f / uFogDensity) / uFogDistance
 		);
-
 	}
-	fColor = color;
+	fColor = color * depth;
 
 }
