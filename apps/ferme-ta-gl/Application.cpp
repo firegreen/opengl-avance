@@ -1,6 +1,8 @@
 #include "Application.hpp"
 #include "Object3D.hpp"
 #include "utils.hpp"
+#include "DiscoScene.hpp"
+#include "GlobalWavPlayer.hpp"
 
 #include <iostream>
 
@@ -10,6 +12,7 @@
 #include <glmlv/imgui_impl_glfw_gl3.hpp>
 #include <glmlv/simple_geometry.hpp>
 #include <GL/glu.h>
+#include <memory>
 
 
 
@@ -39,9 +42,22 @@ int Application::run()
 		glBindSampler(20 + i, DirectionnalLightShadowMap::sampler);
 	}
 
+	glfwSetTime(0.0);
+	
+	// start music
+	glmlv::GlobalWavPlayer::playWav(m_AssetsRootPath / m_AppName / "sounds" / "bgm-intro.wav");
+
 	for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
 	{
 		const auto seconds = glfwGetTime();
+
+		// update music
+		double sloop = (seconds - soundIntroDuration) / soundLoopDuration;
+		if (sloop > soundLoop) {
+			++soundLoop;
+			glmlv::GlobalWavPlayer::stopAll();
+			glmlv::GlobalWavPlayer::playWav(m_AssetsRootPath / m_AppName / "sounds" / "bgm-loop.wav");
+		}
 
 		checkGlError();
 
@@ -143,6 +159,7 @@ int Application::run()
 
 		auto ellapsedTime = glfwGetTime() - seconds;
 		camera.update(float(ellapsedTime));
+		currentScene->update(float(ellapsedTime), camera);
 		camera.getViewMatrix();
 		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 														lightStorageSize, GL_MAP_WRITE_BIT);
@@ -321,7 +338,14 @@ void Application::initialiseSamplerObjects()
 
 void Application::initialiseModels()
 {
-	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", true)));
+	//models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
+	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / m_AppName / "models/bb-unit/bb-unit.obj", true)));
+}
+
+void Application::changeScene(std::shared_ptr<Scene> s)
+{
+	currentScene = s;
+	s->welcome(camera);
 }
 
 void Application::resetLights(int lightsCount)
@@ -649,7 +673,7 @@ Application::Application(int argc, char** argv):
 	m_ImGuiIniFilename { m_AppName + ".imgui.ini" },
 	m_ShadersRootPath { m_AppPath.parent_path() / "shaders" },
 	m_AssetsRootPath { m_AppPath.parent_path() / "assets" },
-	scenes(3),
+	scenes(0),
 	currentScene(nullptr),
 	geometryProgram(m_ShadersRootPath / m_AppName),
 	shadingProgram(m_ShadersRootPath / m_AppName),
@@ -662,16 +686,14 @@ Application::Application(int argc, char** argv):
 	initialiseModels();
 	initialiseBuffer();
 	initialiseLights();
+
+	// Create Scenes
+	scenes.push_back(std::make_shared<DiscoScene>(models));
+
 	if (currentScene == nullptr)
 	{
-		currentScene = &scenes[0];
-		std::shared_ptr<Object3D> ptr(models[0]->instance());
-		currentScene->objects.push_back(ptr);
+		changeScene(scenes[0]);
 		loadSkybox("skybox1","jpg",currentScene->skyboxTexture);
-		camera.FoV = 60;
-		camera.zNear = currentScene->sceneDiag * 0.01;
-		camera.zFar = currentScene->sceneDiag * 2;
-		camera.getProjectionMatrix(true);
 
 		resetLights();
 	}

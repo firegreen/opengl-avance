@@ -2,7 +2,7 @@
 
 ObjectModel* Scene::skyModel = nullptr;
 
-Scene::Scene()
+Scene::Scene(std::vector<std::shared_ptr<ObjectModel>>& models)
 {
 	if (Scene::skyModel == nullptr)
 	{
