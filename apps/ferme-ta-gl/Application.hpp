@@ -53,6 +53,9 @@ public:
 	const static size_t windowWidth;
 	const static size_t windowHeight;
 
+	const float soundIntroDuration = 43.595; //seconds
+	const float soundLoopDuration = 43.517;  //seconds
+
 private:
     void loadImage(std::string filename, GLuint &textureID);
 	void loadSkybox(std::string foldername, std::string ext, GLuint &textureID);
@@ -110,4 +113,6 @@ private:
 	std::shared_ptr<Scene> currentScene;
 
 	float shadowMapBias = 0.01;
+
+	int soundLoop = 0;
 };

@@ -2,6 +2,7 @@
 #include "Object3D.hpp"
 #include "utils.hpp"
 #include "DiscoScene.hpp"
+#include "GlobalWavPlayer.hpp"
 
 #include <iostream>
 
@@ -31,13 +32,21 @@ int Application::run()
 	DirectionnalLight::Data* shadowPtr;
 
 	glfwSetTime(0.0);
-	// TODO start music
+	
+	// start music
+	glmlv::GlobalWavPlayer::playWav(m_AssetsRootPath / m_AppName / "sounds" / "bgm-intro.wav");
 
 	for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
 	{
 		const auto seconds = glfwGetTime();
 
-		// TODO update music
+		// update music
+		double sloop = (seconds - soundIntroDuration) / soundLoopDuration;
+		if (sloop > soundLoop) {
+			++soundLoop;
+			glmlv::GlobalWavPlayer::stopAll();
+			glmlv::GlobalWavPlayer::playWav(m_AssetsRootPath / m_AppName / "sounds" / "bgm-loop.wav");
+		}
 
 		checkGlError();
 
@@ -317,7 +326,8 @@ void Application::initialiseSamplerObjects()
 
 void Application::initialiseModels()
 {
-	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", true)));
+	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
+	//models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / m_AppName / "models/death_star_II/death-star-II.obj", true)));
 }
 
 void Application::changeScene(std::shared_ptr<Scene> s)
