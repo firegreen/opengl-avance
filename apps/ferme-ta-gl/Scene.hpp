@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include "Light.hpp"
 #include "Object3D.hpp"
+#include "Camera.hpp"
 
 #include <glmlv/GLProgram.hpp>
 #include <glmlv/simple_geometry.hpp>
@@ -25,8 +26,6 @@ struct Scene
 	float fogDistance;
 	float fogDensity;
 
-
-
 	glm::vec3 sceneCenter;
 	float sceneDiag = 100;
 
@@ -35,6 +34,8 @@ struct Scene
 	GLuint skyboxTexture = 0;
 	std::shared_ptr<Object3D> skyCube;
 
-	Scene();
+	Scene(std::vector<std::shared_ptr<ObjectModel>>& models);
 	void resetLights(int lightsCount = 3);
+	virtual void welcome(Camera& cam) = 0;
+	virtual void update(float elapsedTime, Camera& cam) = 0;
 };

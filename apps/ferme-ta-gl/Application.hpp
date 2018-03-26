@@ -61,6 +61,7 @@ private:
 	void initialiseScreen();
 	void initialiseSamplerObjects();
 	void initialiseModels();
+	void changeScene(std::shared_ptr<Scene> s);
 
 	void resetLights(int lightsCount = 3);
 
@@ -105,8 +106,8 @@ private:
     GLuint gBufferTextures[GBufferTextureCount];
 
 	std::vector<std::shared_ptr<ObjectModel>> models;
-	std::vector<Scene> scenes;
-	Scene* currentScene;
+	std::vector<std::shared_ptr<Scene>> scenes;
+	std::shared_ptr<Scene> currentScene;
 
 	float shadowMapBias = 0.01;
 };
