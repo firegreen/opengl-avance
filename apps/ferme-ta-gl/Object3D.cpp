@@ -19,6 +19,7 @@ ObjectModel::ObjectModel(const glmlv::fs::path &objPath, bool loadTextures)
 	glBindBuffer(GL_ARRAY_BUFFER, IBO);
 	glBufferStorage(GL_ARRAY_BUFFER, sizeof(uint32_t)*data.indexBuffer.size(), data.indexBuffer.data(), 0);
 
+	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -53,6 +54,8 @@ ObjectModel::ObjectModel(const std::vector<glmlv::Vertex3f3f2f> &vertex, const s
 {
 	data.indexBuffer = indices;
 	data.vertexBuffer = vertex;
+	data.shapeCount = 1;
+	data.materialCount = 0;
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferStorage(GL_ARRAY_BUFFER, vertex.size()*sizeof(glmlv::Vertex3f3f2f), vertex.data(), 0);
@@ -91,14 +94,23 @@ ObjectModel::ObjectModel(const std::vector<glmlv::Vertex3f3f2f> &vertex, const s
 
 ObjectModel::~ObjectModel()
 {
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	glBindVertexArray(0);
+
 	if (IBO) {
 		glDeleteBuffers(1, &IBO);
 	}
+	checkGlError();
 	if (VBO) {
 		glDeleteBuffers(1, &VBO);
 	}
+	checkGlError();
 	if (VAO) {
-		glDeleteBuffers(1, &VAO);
+		glDeleteVertexArrays(1, &VAO);
 	}
 	checkGlError();
 }
@@ -108,8 +120,10 @@ Object3D *ObjectModel::instance()
 	return new Object3D(VBO, VAO, IBO, data, textures);
 }
 
-Object3D::Object3D(GLuint VBO, GLuint VAO, GLuint IBO, const glmlv::ObjData &data, const std::vector<GLuint>& textures)
-	: VBO(VBO), VAO(VAO), IBO(IBO), data(data), textures(textures)
+Object3D::Object3D(GLuint VBO, GLuint VAO, GLuint IBO,
+				   glmlv::ObjData &data, std::vector<GLuint> &textures)
+	: VBO(VBO), VAO(VAO), IBO(IBO),
+	  data(&data), textures(&textures)
 {}
 
 void Object3D::scale(float t)

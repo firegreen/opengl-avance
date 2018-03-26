@@ -101,7 +101,7 @@ vec3 pointColor(vec3 lightColor, vec3 lightPos, vec3 N, vec3 position, vec3 diff
 {
     float distToPointLight = length(lightPos - position);
     vec3 dirToObject = (lightPos - position) / distToPointLight;
-    return (lightColor * blingPhongShininess(dirToObject, vec3(0,0,1), N, diffuse, shininess.rgb, shininess.a)) /
+	return (lightColor) /
             (distToPointLight * distToPointLight);
 }
 
@@ -114,9 +114,10 @@ void main()
 {
 	float depth = texelFetch(uGShadingDepth, ivec2(gl_FragCoord.xy), 0).r;
 	vec3 position = vec3(texelFetch(uGPosition, ivec2(gl_FragCoord.xy), 0));
+	vec3 color;
 	if (depth >= 1.0)
 	{
-		fColor = texture(uSkyboxSampler, position).xyz;
+		color = texture(uSkyboxSampler, position).xyz;
 	}
 	else
 	{
@@ -125,14 +126,12 @@ void main()
 		vec3 ambient = vec3(texelFetch(uGAmbient, ivec2(gl_FragCoord.xy), 0));
 		vec4 shininess = texelFetch(uGlossyShininess, ivec2(gl_FragCoord.xy), 0);
 
-		vec3 color = directionalColor(uDirectionalLightIntensity, uDirectionalLightDir, normal, diffuse, shininess) +
-					 pointColor(uPointLightIntensity, uPointLightPosition, position, normal, diffuse, shininess) +
-					 ambiantColor(uAmbiantLightIntensity, ambient);
+		color = ambiantColor(uAmbiantLightIntensity, ambient);
 		for (int i=0; i<dirLights.length();++i)
 		{
 			if (uCastShadow)
 			{
-				vec4 positionInDirLightScreen = dirLights[i].lightMatrix * vec4(position, 1);
+				/*vec4 positionInDirLightScreen = dirLights[i].lightMatrix * vec4(position, 1);
 				vec3 positionInDirLightNDC = vec3(positionInDirLightScreen / positionInDirLightScreen.w) * 0.5 + 0.5;
 				float dirLightVisibility = textureProj(uShadowLightMap[i],
 														vec4(positionInDirLightNDC.xy,
@@ -157,7 +156,7 @@ void main()
 					color += directionalColor(dirLights[i].color.rgb, dirLights[i].direction.xyz, normal, diffuse, shininess)
 							* dirLightVisibility;
 				}
-				//color = dirLightVisibility * vec3(1,1,0);
+				//color = dirLightVisibility * vec3(1,1,0);*/
 			}
 			else
 			{
@@ -171,13 +170,13 @@ void main()
 
 		for (int i=0; i<pointLights.length();++i)
 			color += pointColor(pointLights[i].color.rgb, pointLights[i].position.xyz, position, normal, diffuse, shininess);
-/*
 		color = mix(
 			color,
 			uFogColor,
 			pow(depth, 1.f / uFogDensity) / uFogDistance
-		);*/
-		
-		fColor = color;
+		);
+
 	}
+	fColor = color;
+
 }

@@ -1,6 +1,8 @@
 #include "shaderPrograms.hpp"
 
+
 #include "utils.hpp"
+#include "Application.hpp"
 
 GeometryProgramHandler::GeometryProgramHandler(glmlv::fs::path path)
 	: glProgram(glmlv::compileProgram({ path / "geometryPass.vs.glsl", path / "geometryPass.fs.glsl" }))
@@ -50,12 +52,6 @@ ShadingProgramHandler::ShadingProgramHandler(glmlv::fs::path path)
 	, uFogDensity(glProgram.getUniformLocation("uFogDensity"))
 	, uFogDistance(glProgram.getUniformLocation("uFogDistance"))
 {
-	bDirLightData = glGetProgramResourceIndex(glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
-	glShaderStorageBlockBinding(glId(), bDirLightData, dirlightBindingIndex);
-
-	bPointLightData = glGetProgramResourceIndex(glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
-	glShaderStorageBlockBinding(glId(), bPointLightData, pointlightBindingIndex);
-
 	checkGlError();
 }
 

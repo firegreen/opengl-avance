@@ -32,7 +32,7 @@ uniform sampler2D uNormalSampler;
 void main()
 {
     fPosition = vViewSpacePosition;
-    fNormal = vViewSpaceNormal;
+	fNormal = vViewSpaceNormal;
 
     fAmbient = uKa;
     if (uUseATexture)
@@ -50,5 +50,5 @@ void main()
     if (uUseShinTexture)
 		shin *= vec3(texture(uKshinSampler, vTexCoords.xy)).r;
 
-    fGlossyShininess = vec4(specular,shin);
+	fGlossyShininess = vec4(specular,shin);
 }

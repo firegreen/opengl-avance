@@ -21,12 +21,13 @@ void Scene::resetLights(int lightsCount)
 	{
 		if (rand()%2)
 		{
-			dirLightData.push_back(DirectionnalLight(glm::vec4(0.2 + rand() % 700 * 0.01,
+			dirLights.push_back(DirectionnalLight(glm::vec4(0.2 + rand() % 700 * 0.01,
 														   0.2 + rand() % 700 * 0.01,
 														   0.2 + rand() % 700 * 0.01,1),
 												 glm::vec4( glm::normalize(glm::vec3(rand() % 100, rand() % 100, rand() % 100)),1)));
-			dirLightData.back().castShadow(true);
-			shadowTextureData.push_back(dirLightData.back().shadowMap.get()->layerID);
+			dirLights.back().castShadow(true);
+			dirLightData.push_back(dirLights.back().data);
+			shadowTextureData.push_back(dirLights.back().shadowMap.get()->layerID);
 		}
 	}
 	for (int i = 0; i < lightsCount; ++i)

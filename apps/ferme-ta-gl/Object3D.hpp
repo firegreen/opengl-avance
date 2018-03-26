@@ -33,7 +33,7 @@ class Object3D
 {
 public:
 
-	Object3D(GLuint VBO, GLuint VAO, GLuint IBO, const glmlv::ObjData& data, const std::vector<GLuint>& textures);
+	Object3D(GLuint VBO, GLuint VAO, GLuint IBO, glmlv::ObjData& data, std::vector<GLuint>& textures);
 
 	void scale(float t);
 	void scale(float x, float y, float z);
@@ -44,7 +44,7 @@ public:
 	const GLuint VAO = 0;
 	const GLuint IBO = 0;
 
-	const glmlv::ObjData& data;
-	const std::vector<GLuint>& textures;
+	glmlv::ObjData* data;
+	std::vector<GLuint>* textures;
 	glm::mat4 modelMatrix;
 };

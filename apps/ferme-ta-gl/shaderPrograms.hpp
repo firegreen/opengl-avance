@@ -1,9 +1,10 @@
+#pragma once
 #include <glmlv/GLProgram.hpp>
 
 #include <glmlv/filesystem.hpp>
 
 struct GeometryProgramHandler {
-	
+
 	GeometryProgramHandler(glmlv::fs::path path);
 
 	glmlv::GLProgram glProgram;
@@ -54,11 +55,9 @@ struct ShadingProgramHandler {
 	GLuint uFogDensity;
 	GLuint uFogDistance;
 
-	// TODO gérer les BindingIndex
-	const static GLuint dirlightBindingIndex = 1, pointlightBindingIndex = 2;
-
 	GLuint bDirLightData;
 	GLuint bPointLightData;
+	GLuint bShadowData;
 };
 
 struct ShadowProgramHandler {

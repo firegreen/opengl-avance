@@ -26,28 +26,18 @@ int Application::run()
 	checkGlError();
 
 	int lightStorageSize = 0;
+	DirectionnalLight::Data* shadowPtr;
 
 	for (auto iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount)
 	{
 		const auto seconds = glfwGetTime();
 
-		if (currentScene == nullptr)
-		{
-			currentScene = &scenes[0];
-			camera.FoV = 60;
-			camera.zNear = currentScene->sceneDiag * 0.001;
-			camera.zFar = currentScene->sceneDiag;
-			camera.getProjectionMatrix(true);
-
-			resetLights();
-		}
-
 		checkGlError();
 
-		lightStorageSize = sizeof(DirectionnalLight)*currentScene->dirLightData.size();
+		lightStorageSize = sizeof(DirectionnalLight::Data)*currentScene->dirLightData.size();
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-		DirectionnalLight* shadowPtr = (DirectionnalLight*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
-																			 lightStorageSize, GL_MAP_WRITE_BIT);
+		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
+														lightStorageSize, GL_MAP_WRITE_BIT);
 
 		checkGlError();
 
@@ -70,6 +60,8 @@ int Application::run()
 		//std::cout << "========= Shading pass process =========" << std::endl;
 		glQueryCounter(queryID[4], GL_TIMESTAMP);
 		start = glfwGetTime();
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+		shadowPtr = nullptr;
 		shadingRender();
 		glQueryCounter(queryID[5], GL_TIMESTAMP);
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
@@ -80,6 +72,13 @@ int Application::run()
 		glQueryCounter(queryID[7], GL_TIMESTAMP);
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
 		checkGlError();
+
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, FBO);
+		glReadBuffer(GL_COLOR_ATTACHMENT1);
+		glBlitFramebuffer(0,0,windowWidth/2,windowHeight,
+						  0,0,windowWidth/2,windowHeight,
+						  GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 		int width = windowWidth; int height = windowHeight;
 		//std::cout << "========= GUI =========" << std::endl;
@@ -127,15 +126,18 @@ int Application::run()
 		//std::cout << "========= Swap Buffers =========" << std::endl;
 		start = glfwGetTime();
 		m_GLFWHandle.swapBuffers();
-		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-		shadowPtr = (DirectionnalLight*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, lightStorageSize, GL_MAP_WRITE_BIT );
 		//std::cout << "\tdone in " << glfwGetTime() - start << "s" << std::endl;
 		checkGlError();
 
 
 		auto ellapsedTime = glfwGetTime() - seconds;
 		camera.update(float(ellapsedTime));
+		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
+														lightStorageSize, GL_MAP_WRITE_BIT);
 		shadowViewUpdate(shadowPtr);
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+		shadowPtr = nullptr;
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 		//std::cout << "========= Shadow map update =========" << std::endl;
 		start = glfwGetTime();
 		glQueryCounter(queryID[10], GL_TIMESTAMP);
@@ -149,7 +151,7 @@ int Application::run()
 				depthProgram = DepthProgramHandler(m_ShadersRootPath / m_AppName);
 			}
 			if (glfwGetKey(m_GLFWHandle.window(), GLFW_KEY_D)) {
-				displayGUI = displayGUI;
+				displayGUI = !displayGUI;
 			}
 		}
 		glQueryCounter(queryID[11], GL_TIMESTAMP);
@@ -262,12 +264,14 @@ void Application::initialiseBuffer()
 void Application::initialiseScreen()
 {
 	glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
-	glGenVertexArrays(1, &shadingVAO);
+
+
 	glGenBuffers(1, &shadingVBO);
 	glBindBuffer(GL_ARRAY_BUFFER, shadingVBO);
 	glBufferStorage(GL_ARRAY_BUFFER, 3*sizeof(glm::vec2), quadCoord, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+	glGenVertexArrays(1, &shadingVAO);
 	glBindVertexArray(shadingVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, shadingVBO);
 
@@ -284,18 +288,6 @@ void Application::initialiseLights()
 	glGenBuffers(1, &dirLightSSBO);
 	glGenBuffers(1, &pointLightSSBO);
 	glGenBuffers(1, &shadowTexturesSSBO);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingId, dirLightSSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingId, pointLightSSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingId, shadowTexturesSSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	checkGlError();
 }
@@ -315,26 +307,50 @@ void Application::initialiseSamplerObjects()
 	glSamplerParameteri(bufferSamplerObject, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
+void Application::initialiseModels()
+{
+	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", true)));
+}
+
 void Application::resetLights(int lightsCount)
 {
 	if (currentScene)
 	{
-		currentScene->resetLights(5);
+		currentScene->resetLights(lightsCount);
+
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
-		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight)*currentScene->dirLightData.size(), currentScene->dirLightData.data(),
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight::Data)*currentScene->dirLightData.size(), currentScene->dirLightData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingId, dirLightSSBO);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		checkGlError();
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*currentScene->pointLightData.size(), currentScene->pointLightData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
-
-		int* textureIDs = new int[currentScene->dirLightData.size()];
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingId, pointLightSSBO);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		checkGlError();
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
-		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(int)*currentScene->dirLightData.size(), textureIDs,
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(int)*currentScene->shadowTextureData.size(), currentScene->shadowTextureData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
-	}
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingId, shadowTexturesSSBO);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+		checkGlError();
+
+		/*shadingProgram.bDirLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bDirLightData");
+		glShaderStorageBlockBinding(shadingProgram.glId(), shadingProgram.bDirLightData, Application::dirlightBindingId);
+
+		shadingProgram.bPointLightData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bPointLightData");
+		glShaderStorageBlockBinding(shadingProgram.glId(), shadingProgram.bPointLightData, Application::pointlightBindingId);
+
+		shadingProgram.bShadowData = glGetProgramResourceIndex(shadingProgram.glId(), GL_SHADER_STORAGE_BLOCK, "bShadowData");
+		glShaderStorageBlockBinding(shadingProgram.glId(), shadingProgram.bShadowData, Application::shadowBindingId);
+*/
+		checkGlError();
+	}
 }
 
 void Application::solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height)
@@ -344,22 +360,24 @@ void Application::solidRenderTo(GLuint FBO, size_t x, size_t y, size_t width, si
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
 	glViewport(x, y, width, height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	checkGlError();
 	if (currentScene)
 	{
-		for (const std::unique_ptr<Object3D>& oPtr : currentScene->objects)
+		for (const std::shared_ptr<Object3D>& oPtr : currentScene->objects)
 		{
 			const Object3D& o = *oPtr.get();
 			glBindVertexArray(o.VAO);
 			int indexCount, indexOffset = 0;
-			for (int i = 0; i < o.data.shapeCount; i++)
+			for (int i = 0; i < o.data->shapeCount; i++)
 			{
-				indexCount = o.data.indexCountPerShape[i];
+				indexCount = o.data->indexCountPerShape[i];
 				glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, (const GLvoid*)(indexOffset * sizeof(GLuint)));
 				indexOffset += indexCount;
 			}
 			glBindVertexArray(0);
 		}
 	}
+	checkGlError();
 }
 
 void Application::solidRender()
@@ -374,17 +392,31 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FBO);
 	glViewport(x, y, width, height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	checkGlError();
+
+	glm::mat4 VPMatrix = camera.getVPMatrix();
+	glm::mat4 MVMatrix = glm::scale(glm::mat4(), glm::vec3(100,100,100));
+	glm::mat4 MVPMatrix = VPMatrix;
+	glm::mat4 normalMat =  glm::mat4();
+
+	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewMatrix,     1, GL_FALSE, glm::value_ptr(MVMatrix));
+	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewProjMatrix, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+	glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uNormalMatrix,        1, GL_FALSE, glm::value_ptr(normalMat));
+
+	geometryProgram.glProgram.use();
 
 	glDepthMask(GL_FALSE);
 	glBindVertexArray(currentScene->skyCube->VAO);
-	glDrawElements(GL_TRIANGLES, currentScene->skyCube->data.indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
+	//glDrawElements(GL_TRIANGLES, currentScene->skyCube->data->indexBuffer.size(), GL_UNSIGNED_INT, (const GLvoid*) (0));
 	glDepthMask(GL_TRUE);
+	checkGlError();
 
 	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKdSampler, 0); // Set the uniform to 0 because we use texture unit 0
 	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKaSampler, 1);
 	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKspecSampler, 2);
 	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uKshinSampler, 3);
 	glProgramUniform1i(geometryProgram.glId(), geometryProgram.uNormalSampler, 4);
+	checkGlError();
 
 	glBindSampler(0, samplerObject);
 	glBindSampler(1, samplerObject);
@@ -394,17 +426,16 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 
 	checkGlError();
 
-	glm::mat4 VPMatrix = camera.getVPMatrix();
 
 	if (currentScene)
 	{
 		glDepthMask(GL_TRUE);
-		for (const std::unique_ptr<Object3D>& oPtr : currentScene->objects)
+		for (const std::shared_ptr<Object3D>& oPtr : currentScene->objects)
 		{
 			const Object3D& o = *oPtr.get();
-			glm::mat4 MVMatrix = camera.getViewMatrix() * o.modelMatrix;
-			glm::mat4 MVPMatrix = VPMatrix * o.modelMatrix;
-			glm::mat4 normalMat = glm::transpose(glm::inverse(MVMatrix));
+			MVMatrix = camera.getViewMatrix() * o.modelMatrix;
+			MVPMatrix = VPMatrix * o.modelMatrix;
+			normalMat = glm::transpose(glm::inverse(MVMatrix));
 
 			glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewMatrix,     1, GL_FALSE, glm::value_ptr(MVMatrix));
 			glProgramUniformMatrix4fv(geometryProgram.glId(), geometryProgram.uModelViewProjMatrix, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
@@ -412,15 +443,15 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 
 			glBindVertexArray(o.VAO);
 			int indexCount, indexOffset = 0;
-			if (o.data.materialCount)
+			if (o.data->materialCount)
 			{
-				for (int i=0; i<o.data.shapeCount; i++)
+				for (int i=0; i<o.data->shapeCount; i++)
 				{
-					const glmlv::ObjData::PhongMaterial& mat= o.data.materials[o.data.materialIDPerShape[i]];
+					const glmlv::ObjData::PhongMaterial& mat= o.data->materials[o.data->materialIDPerShape[i]];
 					if (mat.KdTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE0);
-						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KdTextureId]);
+						glBindTexture(GL_TEXTURE_2D, (*o.textures)[mat.KdTextureId]);
 						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseDTexture, 1);
 					}
 					else
@@ -430,7 +461,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 					if (mat.KaTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE1);
-						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KaTextureId]);
+						glBindTexture(GL_TEXTURE_2D, (*o.textures)[mat.KaTextureId]);
 						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseATexture, 1);
 					}
 					else
@@ -440,7 +471,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 					if (mat.KsTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE2);
-						glBindTexture(GL_TEXTURE_2D, o.textures[mat.KsTextureId]);
+						glBindTexture(GL_TEXTURE_2D, (*o.textures)[mat.KsTextureId]);
 						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseSpecTexture, 1);
 					}
 					else
@@ -450,7 +481,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 					if (mat.shininessTextureId>=0)
 					{
 						glActiveTexture(GL_TEXTURE3);
-						glBindTexture(GL_TEXTURE_2D, o.textures[mat.shininessTextureId]);
+						glBindTexture(GL_TEXTURE_2D, (*o.textures)[mat.shininessTextureId]);
 						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseShinTexture, 1);
 					}
 					else
@@ -458,7 +489,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 						glProgramUniform1i(geometryProgram.glId(), geometryProgram.uUseShinTexture, 0);
 					}
 
-					indexCount = o.data.indexCountPerShape[i];
+					indexCount = o.data->indexCountPerShape[i];
 					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKd, mat.Kd.r,mat.Kd.g,mat.Kd.b);
 					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKs, mat.Ks.r,mat.Ks.g,mat.Ks.b);
 					glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKa, mat.Ka.r,mat.Ka.g,mat.Ka.b);
@@ -471,7 +502,7 @@ void Application::materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width,
 			{
 				glm::vec3 Kd(0.8f,0.8f,0.8f);
 				glProgramUniform3f(geometryProgram.glId(), geometryProgram.uKd, Kd.r, Kd.g, Kd.b);
-				glDrawElements(GL_TRIANGLES, o.data.indexBuffer.size(), GL_UNSIGNED_INT, 0);
+				glDrawElements(GL_TRIANGLES, o.data->indexBuffer.size(), GL_UNSIGNED_INT, 0);
 			}
 			glBindVertexArray(0);
 			checkGlError();
@@ -484,39 +515,41 @@ void Application::materialRender()
 	materialRenderTo(FBO, 0, 0, windowWidth, windowHeight);
 }
 
-void Application::shadowRender(DirectionnalLight *shadowPtr)
+void Application::shadowRender(DirectionnalLight::Data *shadowPtr)
 {
-	for (int i=0; i< currentScene->dirLightData.size(); ++i)
+	for (int i=0; i< currentScene->dirLights.size(); ++i)
 	{
-		if (currentScene->dirLightData[i].shadowMap.get())
+		if (currentScene->dirLights[i].shadowMap.get())
 		{
-			DirectionnalLightShadowMap& shadow = *currentScene->dirLightData[i].shadowMap.get();
+			DirectionnalLightShadowMap& shadow = *currentScene->dirLights[i].shadowMap.get();
 			if (shadow.isDirty)
 			{
 				shadowProgram.glProgram.use();
-				currentScene->dirLightData[i].computeMatrix(currentScene->sceneCenter, currentScene->sceneDiag);
+				currentScene->dirLights[i].computeMatrix(currentScene->sceneCenter, currentScene->sceneDiag);
 				glUniformMatrix4fv(shadowProgram.uDirLightViewProjMatrixShadow, 1,
-								   GL_FALSE, glm::value_ptr(currentScene->dirLightData[i].data.lightMatrix));
+								   GL_FALSE, glm::value_ptr(currentScene->dirLights[i].data.lightMatrix));
+				checkGlError();
 				solidRenderTo(shadow.FBO, 0, 0, DirectionnalLightShadowMap::resolution, DirectionnalLightShadowMap::resolution);
-				currentScene->dirLightData[i].data.lightMatrix = currentScene->dirLightData[i].data.lightMatrix *
+				currentScene->dirLights[i].data.lightMatrix = currentScene->dirLights[i].data.lightMatrix *
 						camera.getRcpViewMatrix();
-				memcpy(shadowPtr + i, (void*)&currentScene->dirLightData[i].data, sizeof(glm::mat4));
+				memcpy(shadowPtr + i, (void*)&currentScene->dirLights[i].data, sizeof(glm::mat4));
 				shadow.isDirty = false;
+				checkGlError();
 			}
 		}
 	}
 }
 
-void Application::shadowViewUpdate(DirectionnalLight *shadowPtr)
+void Application::shadowViewUpdate(DirectionnalLight::Data *shadowPtr)
 {
 	for (int i=0; i< currentScene->dirLightData.size(); ++i)
 	{
-		if (currentScene->dirLightData[i].shadowMap.get())
+		if (currentScene->dirLights[i].shadowMap.get())
 		{
-			currentScene->dirLightData[i].computeMatrix(currentScene->sceneCenter, currentScene->sceneDiag);
-			currentScene->dirLightData[i].data.lightMatrix = currentScene->dirLightData[i].data.lightMatrix *
+			currentScene->dirLights[i].computeMatrix(currentScene->sceneCenter, currentScene->sceneDiag);
+			currentScene->dirLights[i].data.lightMatrix = currentScene->dirLights[i].data.lightMatrix *
 					camera.getRcpViewMatrix();
-			memcpy(shadowPtr + i, (void*)&currentScene->dirLightData[i].data, sizeof(glm::mat4));
+			memcpy(shadowPtr + i, (void*)&currentScene->dirLights[i].data, sizeof(glm::mat4));
 		}
 	}
 }
@@ -531,9 +564,12 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 	{
 		glActiveTexture(GL_TEXTURE30);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, currentScene->skyboxTexture);
+
+		checkGlError();
 		glProgramUniform1i(shadingProgram.glId(), shadingProgram.uSkyboxSampler, 30);
 
-		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uAmbiantLightIntensity, 1, glm::value_ptr(currentScene->ambiantLight));
+		glProgramUniform3fv(shadingProgram.glId(), shadingProgram.uAmbiantLightIntensity, 1,
+							glm::value_ptr(currentScene->ambiantLight));
 
 		glProgramUniform1f(shadingProgram.glId(), shadingProgram.uShadowMapBias, shadowMapBias);
 
@@ -560,6 +596,7 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GNormal]);
 		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, gBufferTextures[GDepth]);
+		checkGlError();
 
 		glBindSampler(0, bufferSamplerObject);
 		glBindSampler(1, bufferSamplerObject);
@@ -567,12 +604,13 @@ void Application::shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, 
 		glBindSampler(3, bufferSamplerObject);
 		glBindSampler(4, bufferSamplerObject);
 		glBindSampler(5, bufferSamplerObject);
+		checkGlError();
 
 		shadingProgram.glProgram.use();
-
 		glBindVertexArray(shadingVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glBindVertexArray(0);
+		checkGlError();
 	}
 }
 
@@ -587,7 +625,6 @@ Application::Application(int argc, char** argv):
 	m_ImGuiIniFilename { m_AppName + ".imgui.ini" },
 	m_ShadersRootPath { m_AppPath.parent_path() / "shaders" },
 	m_AssetsRootPath { m_AppPath.parent_path() / "assets" },
-	models(5),
 	scenes(3),
 	currentScene(nullptr),
 	geometryProgram(m_ShadersRootPath / m_AppName),
@@ -598,12 +635,25 @@ Application::Application(int argc, char** argv):
 	glm::vec2 quadCoord[3] = {glm::vec2(-1,-1), glm::vec2(3,-1), glm::vec2(-1, 3)};
 	ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows positions in this file
 
-	checkGlError();
-
+	initialiseModels();
 	initialiseBuffer();
-	initialiseScreen();
 	initialiseLights();
+	if (currentScene == nullptr)
+	{
+		currentScene = &scenes[0];
+		std::shared_ptr<Object3D> ptr(models[0]->instance());
+		currentScene->objects.push_back(ptr);
+		loadSkybox("skybox1","jpg",currentScene->skyboxTexture);
+		camera.FoV = 60;
+		camera.zNear = currentScene->sceneDiag * 0.001;
+		camera.zFar = currentScene->sceneDiag;
+		camera.getProjectionMatrix(true);
+
+		resetLights();
+	}
+	initialiseScreen();
 	initialiseSamplerObjects();
+
 
 	checkGlError();
 }
@@ -612,7 +662,7 @@ Application::~Application()
 {
 	if (shadingVAO)
 	{
-		glDeleteBuffers(1, &shadingVAO);
+		glDeleteVertexArrays(1, &shadingVAO);
 	}
 	if (shadingVBO)
 	{

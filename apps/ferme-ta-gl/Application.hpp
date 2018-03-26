@@ -60,6 +60,7 @@ private:
 	void initialiseBuffer();
 	void initialiseScreen();
 	void initialiseSamplerObjects();
+	void initialiseModels();
 
 	void resetLights(int lightsCount = 3);
 
@@ -67,8 +68,8 @@ private:
 	void solidRender();
 	void materialRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
 	void materialRender();
-	void shadowRender(DirectionnalLight* shadowPtr);
-	void shadowViewUpdate(DirectionnalLight* shadowPtr);
+	void shadowRender(DirectionnalLight::Data *shadowPtr);
+	void shadowViewUpdate(DirectionnalLight::Data* shadowPtr);
 	void shadingRenderTo(GLuint FBO, size_t x, size_t y, size_t width, size_t height);
 	void shadingRender();
 
@@ -81,8 +82,8 @@ private:
     const glmlv::fs::path m_ShadersRootPath;
     const glmlv::fs::path m_AssetsRootPath;
 
-	GLuint samplerObject;
-	GLuint bufferSamplerObject;
+	GLuint samplerObject = 0;
+	GLuint bufferSamplerObject = 0;
 
 	bool displayGUI = false;
 
@@ -103,7 +104,7 @@ private:
 
     GLuint gBufferTextures[GBufferTextureCount];
 
-	std::vector<ObjectModel*> models;
+	std::vector<std::shared_ptr<ObjectModel>> models;
 	std::vector<Scene> scenes;
 	Scene* currentScene;
 

@@ -14,7 +14,8 @@ struct Scene
 {
 	static ObjectModel* skyModel;
 
-	std::vector<DirectionnalLight> dirLightData;
+	std::vector<DirectionnalLight::Data> dirLightData;
+	std::vector<DirectionnalLight> dirLights;
 	std::vector<uint32_t> shadowTextureData;
 	std::vector<PointLight> pointLightData;
 
@@ -29,10 +30,10 @@ struct Scene
 	glm::vec3 sceneCenter;
 	float sceneDiag = 100;
 
-	std::vector<std::unique_ptr<Object3D>> objects;
+	std::vector<std::shared_ptr<Object3D>> objects;
 
 	GLuint skyboxTexture = 0;
-	std::unique_ptr<Object3D> skyCube;
+	std::shared_ptr<Object3D> skyCube;
 
 	Scene();
 	void resetLights(int lightsCount = 3);
