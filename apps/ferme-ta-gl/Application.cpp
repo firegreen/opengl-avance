@@ -326,8 +326,8 @@ void Application::initialiseSamplerObjects()
 
 void Application::initialiseModels()
 {
-	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
-	//models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / m_AppName / "models/death_star_II/death-star-II.obj", true)));
+	//models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
+	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / m_AppName / "models/bb-unit/bb-unit.obj", true)));
 }
 
 void Application::changeScene(std::shared_ptr<Scene> s)

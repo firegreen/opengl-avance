@@ -7,6 +7,9 @@ DiscoScene::DiscoScene(std::vector<std::shared_ptr<ObjectModel>>& models)
 
 	std::shared_ptr<Object3D> ptr(models[0]->instance());
 	objects.push_back(ptr);
+
+	ptr->translate(0, 0, -200);
+	ptr->scale(0.1);
 }
 
 void DiscoScene::welcome(Camera& camera)
@@ -18,7 +21,7 @@ void DiscoScene::welcome(Camera& camera)
 	camera.getProjectionMatrix(true);
 
 	camera.rotationSpeed = glm::vec3(0, 0, 0);
-	camera.translationSpeed = glm::vec3(0, 0, -1);
+	camera.translationSpeed = glm::vec3(0, 0, -0.05);
 }
 
 void DiscoScene::update(float elapsedTime, Camera & cam)
