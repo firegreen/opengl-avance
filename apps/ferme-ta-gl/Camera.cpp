@@ -23,6 +23,7 @@ void Camera::update(float elapsedTime)
 	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.x*elapsedTime, glm::vec3(1,0,0));
 	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.y*elapsedTime, glm::vec3(0,1,0));
 	modelMatrix = glm::rotate(modelMatrix, rotationSpeed.z*elapsedTime, glm::vec3(0,0,1));
+	rotationSpeed.x *= 2 * (1+rotationSpeed.x);
 }
 
 const glm::mat4& Camera::getViewMatrix()

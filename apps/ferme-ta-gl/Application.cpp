@@ -21,6 +21,7 @@ const size_t Application::windowWidth = 1200;
 
 int Application::run()
 {
+	
 	// Profiling
 	GLuint64 startTime, stopTime;
 	GLuint queryID[20];
@@ -31,7 +32,7 @@ int Application::run()
 	int lightStorageSize = 0;
 	DirectionnalLight::Data* shadowPtr;
 
-	GLint texturesunits[DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT];
+	GLint texturesunits[10];
 	for (int i=0; i < DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT; ++i)
 		texturesunits[i] = 20 + i;
 	glProgramUniform1iv(shadingProgram.glId(), shadingProgram.uShadowLightMap, DirectionnalLightShadowMap::DIR_MAX_SHADOW_COUNT, texturesunits);
@@ -59,12 +60,19 @@ int Application::run()
 			glmlv::GlobalWavPlayer::playWav(m_AssetsRootPath / m_AppName / "sounds" / "bgm-loop.wav");
 		}
 
+		sloop = seconds / lightLoopDuration;
+		if (sloop > lightLoop) {
+			++lightLoop;
+			//resetLights(5);
+		}
+
+
 		checkGlError();
 
 		lightStorageSize = sizeof(DirectionnalLight::Data)*currentScene->dirLightData.size();
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 		shadowPtr = (DirectionnalLight::Data*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
-														lightStorageSize, GL_MAP_WRITE_BIT);
+														lightStorageSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 		checkGlError();
 
 		double start = glfwGetTime();
@@ -318,6 +326,26 @@ void Application::initialiseLights()
 	glGenBuffers(1, &pointLightSSBO);
 	glGenBuffers(1, &shadowTexturesSSBO);
 
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight::Data)*currentScene->dirLightData.size(), currentScene->dirLightData.data(),
+		GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingId, dirLightSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	checkGlError();
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*currentScene->pointLightData.size(), currentScene->pointLightData.data(),
+		GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingId, pointLightSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	checkGlError();
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(int)*currentScene->shadowTextureData.size(), currentScene->shadowTextureData.data(),
+		GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingId, shadowTexturesSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
 	checkGlError();
 }
 
@@ -338,7 +366,7 @@ void Application::initialiseSamplerObjects()
 
 void Application::initialiseModels()
 {
-	//models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
+	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / "glmlv/models/crytek-sponza/sponza.obj", false)));
 	models.push_back(std::shared_ptr<ObjectModel>(new ObjectModel(m_AssetsRootPath / m_AppName / "models/bb-unit/bb-unit.obj", true)));
 }
 
@@ -354,24 +382,22 @@ void Application::resetLights(int lightsCount)
 	{
 		currentScene->resetLights(lightsCount);
 
+		glInvalidateBufferData(dirLightSSBO);
+		glInvalidateBufferData(pointLightSSBO);
+		glInvalidateBufferData(shadowTexturesSSBO);
+
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dirLightSSBO);
 		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(DirectionnalLight::Data)*currentScene->dirLightData.size(), currentScene->dirLightData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, dirlightBindingId, dirLightSSBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-		checkGlError();
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(PointLight)*currentScene->pointLightData.size(), currentScene->pointLightData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, pointlightBindingId, pointLightSSBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-		checkGlError();
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowTexturesSSBO);
 		glBufferStorage(GL_SHADER_STORAGE_BUFFER, sizeof(int)*currentScene->shadowTextureData.size(), currentScene->shadowTextureData.data(),
 			GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, shadowBindingId, shadowTexturesSSBO);
+
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 		checkGlError();
@@ -685,7 +711,7 @@ Application::Application(int argc, char** argv):
 
 	initialiseModels();
 	initialiseBuffer();
-	initialiseLights();
+	
 
 	// Create Scenes
 	scenes.push_back(std::make_shared<DiscoScene>(models));
@@ -693,10 +719,10 @@ Application::Application(int argc, char** argv):
 	if (currentScene == nullptr)
 	{
 		changeScene(scenes[0]);
-		loadSkybox("skybox1","jpg",currentScene->skyboxTexture);
-
-		resetLights();
+		loadSkybox("skybox2","jpg",currentScene->skyboxTexture);
+		resetLights(10);
 	}
+	initialiseLights();
 	initialiseScreen();
 	initialiseSamplerObjects();
 

@@ -20,7 +20,7 @@ void Scene::resetLights(int lightsCount)
 	dirLights.push_back(DirectionnalLight(glm::vec4(0.2 + (float)(rand() % 140) * 0.01,
 												   0.2 + (float)(rand() % 140) * 0.01,
 												   0.2 + (float)(rand() % 140) * 0.01,1),
-										 glm::vec4( glm::normalize(glm::vec3(-50 + rand() % 100, -50, -50 + rand() % 100)),0)));
+										 glm::vec4( glm::normalize(glm::vec3(-100 + rand() % 200, -50 + rand() % 100, -100 + rand() % 200)),0)));
 	dirLights.back().castShadow(true);
 	dirLightData.push_back(dirLights.back().data);
 	shadowTextureData.push_back(dirLights.back().shadowMap.get()->layerID);
@@ -31,7 +31,7 @@ void Scene::resetLights(int lightsCount)
 			dirLights.push_back(DirectionnalLight(glm::vec4(0.2 + (float)(rand() % 140) * 0.01,
 														   0.2 + (float)(rand() % 140) * 0.01,
 														   0.2 + (float)(rand() % 140) * 0.01,1),
-												 glm::vec4( glm::normalize(glm::vec3(-50 + rand() % 100, -50, -50 + rand() % 100)),0)));
+												 glm::vec4( glm::normalize(glm::vec3(-100 + rand() % 200, -50 + rand() % 100, -100 + rand() % 200)),0)));
 			dirLights.back().castShadow(true);
 			dirLightData.push_back(dirLights.back().data);
 			shadowTextureData.push_back(dirLights.back().shadowMap.get()->layerID);

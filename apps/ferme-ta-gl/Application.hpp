@@ -55,6 +55,7 @@ public:
 
 	const float soundIntroDuration = 43.595; //seconds
 	const float soundLoopDuration = 43.517;  //seconds
+	const float lightLoopDuration = 3;  //seconds
 
 private:
     void loadImage(std::string filename, GLuint &textureID);
@@ -115,4 +116,5 @@ private:
 	float shadowMapBias = 0.01;
 
 	int soundLoop = 0;
+	int lightLoop = 0;
 };
